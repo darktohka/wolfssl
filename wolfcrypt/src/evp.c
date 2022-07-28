@@ -542,7 +542,12 @@ static int evpCipherBlock(WOLFSSL_EVP_CIPHER_CTX *ctx,
     #ifndef NO_RC4
         case ARC4_TYPE:
             wc_Arc4Process(&ctx->cipher.arc4, out, in, inl);
-        break;
+            break;
+    #endif
+    #if defined(HAVE_CHACHA) && defined(HAVE_POLY1305)
+        case CHACHA20_POLY1305_TYPE:
+            ret = wc_Chacha_Process(&ctx->cipher.chacha, out, in, inl);
+            break;
     #endif
         default:
             return WOLFSSL_FAILURE;
@@ -7006,6 +7011,15 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
             case ARC4_TYPE :
                 WOLFSSL_MSG("ARC4");
                 wc_Arc4Process(&ctx->cipher.arc4, dst, src, len);
+                if (ret == 0)
+                    ret = len;
+                break;
+#endif
+
+#if defined(HAVE_CHACHA) && defined(HAVE_POLY1305)
+            case CHACHA20_POLY1305_TYPE :
+                WOLFSSL_MSG("CHACHA20 POLY1305");
+                wc_Chacha_Process(&ctx->cipher.chacha, dst, src, len);
                 if (ret == 0)
                     ret = len;
                 break;
