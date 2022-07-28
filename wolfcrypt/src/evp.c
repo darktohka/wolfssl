@@ -8386,7 +8386,7 @@ int wolfSSL_EVP_CIPHER_CTX_iv_length(const WOLFSSL_EVP_CIPHER_CTX* ctx)
             return AES_BLOCK_SIZE;
 #endif /* WOLFSSL_AES_XTS */
 #if defined(HAVE_CHACHA) && defined(HAVE_POLY1305)
-        case CHACHA20_POLY1305_AEAD_IV_SIZE:
+        case CHACHA20_POLY1305_TYPE:
             WOLFSSL_MSG("CHACHA20 POLY1305");
             return CHACHA20_POLY1305_AEAD_IV_SIZE;
 #endif /* HAVE_CHACHA HAVE_POLY1305 */
