@@ -3145,9 +3145,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
             do {
                 err = 0; /* reset error */
                 ret = SSL_accept(ssl);
-#ifdef WOLFSSL_EARLY_DATA
-                EarlyDataStatus(ssl);
-#endif
                 if (ret != WOLFSSL_SUCCESS) {
                     err = SSL_get_error(ssl, 0);
                 #ifdef WOLFSSL_ASYNC_CRYPT
@@ -3161,6 +3158,9 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
         }
 #else
         ret = NonBlockingSSL_Accept(ssl);
+#endif
+#ifdef WOLFSSL_EARLY_DATA
+        EarlyDataStatus(ssl);
 #endif
         if (ret != WOLFSSL_SUCCESS) {
             err = SSL_get_error(ssl, 0);

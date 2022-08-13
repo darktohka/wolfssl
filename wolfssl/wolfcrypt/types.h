@@ -226,7 +226,7 @@ typedef struct w64wrapper {
 #endif /* WORD64_AVAILABLE && WOLFSSL_W64_WRAPPER_TEST */
 } w64wrapper;
 
-#ifdef WC_PTR_TYPE /* Allow user suppied type */
+#ifdef WC_PTR_TYPE /* Allow user supplied type */
     typedef WC_PTR_TYPE wc_ptr_t;
 #elif defined(HAVE_UINTPTR_T)
     #include <stdint.h>
@@ -947,6 +947,7 @@ typedef struct w64wrapper {
         DYNAMIC_TYPE_CMAC         = 94,
         DYNAMIC_TYPE_FALCON       = 95,
         DYNAMIC_TYPE_SESSION      = 96,
+        DYNAMIC_TYPE_DILITHIUM    = 97,
         DYNAMIC_TYPE_SNIFFER_SERVER     = 1000,
         DYNAMIC_TYPE_SNIFFER_SESSION    = 1001,
         DYNAMIC_TYPE_SNIFFER_PB         = 1002,

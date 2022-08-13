@@ -176,6 +176,8 @@ enum wolfSSL_ErrorCodes {
     HTTP_APPSTR_ERR              = -449,   /* HTTP Application string error */
     UNSUPPORTED_PROTO_VERSION    = -450,   /* bad/unsupported protocol version*/
     FALCON_KEY_SIZE_E            = -451,   /* Wrong key size for Falcon. */
+    QUIC_TP_MISSING_E            = -452,   /* QUIC transport parameter missing */
+    DILITHIUM_KEY_SIZE_E         = -453,   /* Wrong key size for Dilithium. */
 
     /* add strings to wolfSSL_ERR_reason_error_string in internal.c !!!!! */
 

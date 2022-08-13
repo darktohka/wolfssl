@@ -49,6 +49,7 @@ int SetCipherSpecs(WOLFSSL* ssl)
         /* server side verified before SetCipherSpecs call */
         if (VerifyClientSuite(ssl) != 1) {
             WOLFSSL_MSG("SetCipherSpecs() client has an unusable suite");
+            WOLFSSL_ERROR_VERBOSE(UNSUPPORTED_SUITE);
             return UNSUPPORTED_SUITE;
         }
     }
@@ -2056,6 +2057,7 @@ int SetCipherSpecs(WOLFSSL* ssl)
 
     default:
         WOLFSSL_MSG("Unsupported cipher suite, SetCipherSpecs");
+        WOLFSSL_ERROR_VERBOSE(UNSUPPORTED_SUITE);
         return UNSUPPORTED_SUITE;
     }  /* switch */
     }  /* if ECC / Normal suites else */
@@ -2986,6 +2988,11 @@ int SetKeysSide(WOLFSSL* ssl, enum encrypt_side side)
     if (ret == 0 && ssl->options.dtls && IsAtLeastTLSv1_3(ssl->version))
         ret = Dtls13SetRecordNumberKeys(ssl, side);
 #endif /* WOLFSSL_DTLS13 */
+#ifdef WOLFSSL_QUIC
+    if (ret == 0 && WOLFSSL_IS_QUIC(ssl)) {
+        ret = wolfSSL_quic_keys_active(ssl, side);
+    }
+#endif /* WOLFSSL_QUIC */
 
 #ifdef HAVE_SECURE_RENEGOTIATION
 #ifdef WOLFSSL_DTLS

@@ -323,7 +323,8 @@ struct WOLFSSL_ASN1_OBJECT {
     int    grp;  /* type of OID, i.e. oidCertPolicyType */
     int    nid;
     unsigned int  objSz;
-#if defined(OPENSSL_ALL) || defined(WOLFSSL_QT) || defined(WOLFSSL_APACHE_HTTPD)
+#if defined(OPENSSL_EXTRA) || defined(OPENSSL_ALL) || defined(WOLFSSL_QT) || \
+    defined(WOLFSSL_APACHE_HTTPD)
     int ca;
     WOLFSSL_ASN1_INTEGER *pathlen;
 #endif
@@ -830,89 +831,155 @@ enum Tls13Secret {
 
 typedef WOLFSSL_METHOD* (*wolfSSL_method_func)(void* heap);
 
-/* CTX Method EX Constructor Functions */
-WOLFSSL_API WOLFSSL_METHOD *wolfTLS_client_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLS_server_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_server_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_client_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_server_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_client_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_server_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_client_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_server_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_client_method_ex(void* heap);
+/* CTX Method Constructor Functions */
+
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLS_client_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLS_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLS_server_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLS_server_method(void);
+#endif
+WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_method_ex(void* heap);
+WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_client_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD* wolfSSLv23_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_server_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_server_method(void);
+#endif
+
+#ifndef NO_OLD_TLS
+
+#ifdef OPENSSL_EXTRA
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD* wolfSSLv2_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD* wolfSSLv2_server_method(void);
+#endif
+#endif /* OPENSSL_EXTRA */
+
+#ifdef WOLFSSL_ALLOW_SSLV3
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_client_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_server_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_server_method(void);
+#endif
+#endif /* WOLFSSL_ALLOW_SSLV3 */
+
+#ifdef WOLFSSL_ALLOW_TLSV10
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_client_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_server_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_server_method(void);
+#endif
+#endif /* WOLFSSL_ALLOW_TLSV10 */
+
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_client_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_server_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_server_method(void);
+#endif
+
+#endif /* NO_OLD_TLS */
+
+#ifndef WOLFSSL_NO_TLS12
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_client_method_ex(void* heap);
+    WOLFSSL_ABI WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_server_method_ex(void* heap);
+    WOLFSSL_ABI WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_server_method(void);
+#endif
+#endif /* !WOLFSSL_NO_TLS12 */
+
 #ifdef WOLFSSL_TLS13
     WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_server_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_client_method_ex(void* heap);
-#endif
-
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_server_method_ex(void* heap);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_client_method_ex(void* heap);
-
-#ifdef WOLFSSL_DTLS
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_client_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_server_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_client_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_server_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_client_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_server_method_ex(void* heap);
-
-#ifdef WOLFSSL_DTLS13
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_3_client_method_ex(void* heap);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_3_server_method_ex(void* heap);
-    WOLFSSL_API int wolfSSL_dtls13_has_pending_msg(WOLFSSL *ssl);
-#endif
-
-#endif
-
-/* CTX Method Constructor Functions */
-WOLFSSL_API WOLFSSL_METHOD *wolfTLS_client_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLS_server_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_server_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv3_client_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_server_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_client_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_server_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_1_client_method(void);
-WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_method(void);
-WOLFSSL_ABI WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_server_method(void);
-WOLFSSL_ABI WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_2_client_method(void);
-#ifdef WOLFSSL_TLS13
     WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_method(void);
-    WOLFSSL_ABI WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_server_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_client_method_ex(void* heap);
     WOLFSSL_ABI WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_client_method(void);
 #endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_server_method_ex(void* heap);
+    WOLFSSL_ABI WOLFSSL_API WOLFSSL_METHOD *wolfTLSv1_3_server_method(void);
+#endif
+#endif /* WOLFSSL_TLS13 */
 
 #ifdef WOLFSSL_DTLS
+
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_method(void);
-    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_server_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_client_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_server_method_ex(void* heap);
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLS_server_method(void);
+#endif
+
+#ifndef NO_OLD_TLS
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_client_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_server_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_server_method(void);
+#endif
+#endif /* !NO_OLD_TLS */
+
+#ifndef WOLFSSL_NO_TLS12
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_method(void);
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_client_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_server_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_2_server_method(void);
+#endif
+#endif /* !WOLFSSL_NO_TLS12 */
 
 #ifdef WOLFSSL_DTLS13
+#ifndef NO_WOLFSSL_CLIENT
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_3_client_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_3_client_method(void);
+#endif
+#ifndef NO_WOLFSSL_SERVER
+    WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_3_server_method_ex(void* heap);
     WOLFSSL_API WOLFSSL_METHOD *wolfDTLSv1_3_server_method(void);
 #endif
+    WOLFSSL_API int wolfSSL_dtls13_has_pending_msg(WOLFSSL *ssl);
+#endif /* WOLFSSL_DTLS13 */
 
-#endif
+#endif /* WOLFSSL_DTLS */
 
 #ifdef HAVE_POLY1305
     WOLFSSL_API int wolfSSL_use_old_poly(WOLFSSL* ssl, int value);
@@ -1120,6 +1187,9 @@ WOLFSSL_API int  wolfSSL_write_early_data(WOLFSSL* ssl, const void* data,
 WOLFSSL_API int  wolfSSL_read_early_data(WOLFSSL* ssl, void* data, int sz,
                                          int* outSz);
 WOLFSSL_API int  wolfSSL_get_early_data_status(const WOLFSSL* ssl);
+#ifdef OPENSSL_EXTRA
+WOLFSSL_API unsigned int wolfSSL_SESSION_get_max_early_data(const WOLFSSL_SESSION *s);
+#endif /* OPENSSL_EXTRA */
 #endif /* WOLFSSL_EARLY_DATA */
 #endif /* WOLFSSL_TLS13 */
 WOLFSSL_ABI WOLFSSL_API void wolfSSL_CTX_free(WOLFSSL_CTX* ctx);
@@ -1413,11 +1483,11 @@ WOLFSSL_API int wolfSSL_sk_push(WOLFSSL_STACK *st, const void *data);
 #include "wolfssl/wolfcrypt/asn.h"
 #endif
 
-#if defined(OPENSSL_ALL) || defined(WOLFSSL_QT)
+#if defined(OPENSSL_ALL) || defined(OPENSSL_EXTRA) || defined(WOLFSSL_QT)
 WOLFSSL_API int wolfSSL_sk_ACCESS_DESCRIPTION_push(
                                        WOLF_STACK_OF(ACCESS_DESCRIPTION)* sk,
                                        WOLFSSL_ACCESS_DESCRIPTION* a);
-#endif /* defined(OPENSSL_ALL) || defined(WOLFSSL_QT) */
+#endif /* defined(OPENSSL_ALL) || OPENSSL_EXTRA || defined(WOLFSSL_QT) */
 
 typedef WOLF_STACK_OF(WOLFSSL_GENERAL_NAME) WOLFSSL_GENERAL_NAMES;
 typedef WOLF_STACK_OF(WOLFSSL_DIST_POINT) WOLFSSL_DIST_POINTS;
@@ -1560,10 +1630,6 @@ WOLFSSL_API WOLF_STACK_OF(WOLFSSL_X509)*
 
 WOLFSSL_API int wolfSSL_OCSP_parse_url(char* url, char** host, char** port,
                                      char** path, int* ssl);
-
-WOLFSSL_API WOLFSSL_METHOD* wolfSSLv23_client_method(void);
-WOLFSSL_API WOLFSSL_METHOD* wolfSSLv2_client_method(void);
-WOLFSSL_API WOLFSSL_METHOD* wolfSSLv2_server_method(void);
 
 #ifndef NO_BIO
 #if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= 0x10100000L
@@ -1750,6 +1816,7 @@ WOLFSSL_API int wolfSSL_X509_signature_print(WOLFSSL_BIO *bp,
 WOLFSSL_API void wolfSSL_X509_get0_signature(const WOLFSSL_ASN1_BIT_STRING **psig,
         const WOLFSSL_X509_ALGOR **palg, const WOLFSSL_X509 *x509);
 WOLFSSL_API int wolfSSL_X509_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509);
+WOLFSSL_API int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509);
 WOLFSSL_ABI WOLFSSL_API char* wolfSSL_X509_NAME_oneline(WOLFSSL_X509_NAME* name,
                                                                     char* in, int sz);
 WOLFSSL_API unsigned long wolfSSL_X509_NAME_hash(WOLFSSL_X509_NAME* name);
@@ -2591,7 +2658,6 @@ WOLFSSL_API void          wolfSSL_ERR_clear_error(void);
 WOLFSSL_API int  wolfSSL_RAND_status(void);
 WOLFSSL_API int  wolfSSL_RAND_pseudo_bytes(unsigned char* buf, int num);
 WOLFSSL_API int  wolfSSL_RAND_bytes(unsigned char* buf, int num);
-WOLFSSL_API WOLFSSL_METHOD *wolfSSLv23_server_method(void);
 WOLFSSL_API long wolfSSL_CTX_set_options(WOLFSSL_CTX* ctx, long opt);
 WOLFSSL_API long wolfSSL_CTX_get_options(WOLFSSL_CTX* ctx);
 WOLFSSL_API long wolfSSL_CTX_clear_options(WOLFSSL_CTX* ctx, long opt);
@@ -3632,7 +3698,9 @@ enum {
     WOLFSSL_MAX_ALPN_NUMBER = 257
 };
 
-#if defined(OPENSSL_ALL) || defined(WOLFSSL_NGINX) || defined(WOLFSSL_HAPROXY) || defined(HAVE_LIGHTY)
+#if defined(OPENSSL_ALL) || defined(WOLFSSL_NGINX) || \
+    defined(WOLFSSL_HAPROXY) || defined(HAVE_LIGHTY) || \
+    defined(WOLFSSL_QUIC)
 typedef int (*CallbackALPNSelect)(WOLFSSL* ssl, const unsigned char** out,
     unsigned char* outLen, const unsigned char* in, unsigned int inLen,
     void *arg);
@@ -4162,7 +4230,7 @@ WOLFSSL_API int wolfSSL_use_RSAPrivateKey_ASN1(WOLFSSL* ssl, unsigned char* der,
 WOLFSSL_API int wolfSSL_CTX_use_PrivateKey_ASN1(int pri, WOLFSSL_CTX* ctx,
                                             unsigned char* der, long derSz);
 
-#if defined(WOLFSSL_QT) || defined(OPENSSL_ALL)
+#if defined(WOLFSSL_QT) || defined(OPENSSL_ALL) || defined(OPENSSL_EXTRA)
 WOLFSSL_API int wolfSSL_X509_cmp(const WOLFSSL_X509* a, const WOLFSSL_X509* b);
 WOLFSSL_API const WOLFSSL_STACK *wolfSSL_X509_get0_extensions(const WOLFSSL_X509 *x);
 WOLFSSL_API const WOLFSSL_STACK *wolfSSL_X509_REQ_get_extensions(const WOLFSSL_X509 *x);
