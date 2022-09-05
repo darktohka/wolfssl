@@ -164,6 +164,7 @@ WOLFSSL_API void wolfSSL_Debugging_OFF(void);
     WOLFSSL_API int WOLFSSL_IS_DEBUG_ON(void);
 #if !defined(_WIN32) && defined(XVSNPRINTF)
     WOLFSSL_API void WOLFSSL_MSG_EX(const char* fmt, ...);
+    #define HAVE_WOLFSSL_MSG_EX
 #else
     #define WOLFSSL_MSG_EX(m, ...)
 #endif
@@ -203,9 +204,9 @@ WOLFSSL_API void wolfSSL_Debugging_OFF(void);
           OPENSSL_EXTRA */
 
 #ifdef WOLFSSL_VERBOSE_ERRORS
-    #define WOLFSSL_ERROR_VERBOSE WOLFSSL_ERROR
+#define WOLFSSL_ERROR_VERBOSE(e) WOLFSSL_ERROR(e)
 #else
-    #define WOLFSSL_ERROR_VERBOSE(e)
+#define WOLFSSL_ERROR_VERBOSE(e) (void)(e)
 #endif /* WOLFSSL_VERBOSE_ERRORS */
 
 #ifdef HAVE_STACK_SIZE_VERBOSE

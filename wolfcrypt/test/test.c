@@ -406,6 +406,7 @@ WOLFSSL_TEST_SUBROUTINE int  sha256_test(void);
 WOLFSSL_TEST_SUBROUTINE int  sha512_test(void);
 WOLFSSL_TEST_SUBROUTINE int  sha384_test(void);
 WOLFSSL_TEST_SUBROUTINE int  sha3_test(void);
+WOLFSSL_TEST_SUBROUTINE int  shake128_test(void);
 WOLFSSL_TEST_SUBROUTINE int  shake256_test(void);
 WOLFSSL_TEST_SUBROUTINE int  hash_test(void);
 WOLFSSL_TEST_SUBROUTINE int  hmac_md5_test(void);
@@ -918,6 +919,13 @@ options: [-s max_relative_stack_bytes] [-m max_relative_heap_memory_bytes]\n\
         return err_sys("SHA-3    test failed!\n", ret);
     else
         TEST_PASS("SHA-3    test passed!\n");
+#endif
+
+#ifdef WOLFSSL_SHAKE128
+    if ( (ret = shake128_test()) != 0)
+        return err_sys("SHAKE128 test failed!\n", ret);
+    else
+        TEST_PASS("SHAKE128 test passed!\n");
 #endif
 
 #ifdef WOLFSSL_SHAKE256
@@ -3491,7 +3499,499 @@ WOLFSSL_TEST_SUBROUTINE int sha3_test(void)
 }
 #endif /* WOLFSSL_SHA3 */
 
+#ifdef WOLFSSL_SHAKE128
+static int shake128_absorb_test(wc_Shake* sha)
+{
+    byte  hash[WC_SHA3_128_BLOCK_SIZE*2];
+
+    testVector a, b, c, d, e;
+    testVector test_sha[5];
+    int ret = 0;
+    int times = sizeof(test_sha) / sizeof(struct testVector), i;
+
+    byte large_input[1024];
+    const char* large_digest =
+        "\x2b\xd1\x69\x9f\xb3\x75\x40\x74\xb8\xb2\xd2\x0b\x92\x47\x9b\xfe"
+        "\xc9\x91\x48\xbe\xda\xa4\x09\xd7\x61\x35\x18\x05\x07\x71\xa5\x61"
+        "\x4d\xc4\x94\xad\xbe\x04\x7d\xad\x95\x2f\xeb\x2c\xc0\x10\x67\x43"
+        "\x40\xf1\x4a\x58\x1c\x54\xfa\x24\x1c\x1a\x4e\x8d\x9b\xbc\xea\xa7"
+        "\x32\xf2\x4c\xc7\x86\x05\x36\xdc\xb4\x42\xd8\x35\xd1\xb4\xa2\x79"
+        "\xa2\xe6\xee\x67\x4f\xbf\x2a\x93\x41\x88\x25\x56\x29\x90\x1a\x06"
+        "\xba\xfe\x9f\xa6\x1a\x74\xe8\x7e\x85\x4a\xc8\x58\x60\xb1\x7b\x18"
+        "\xdf\x77\x59\x46\x04\xc1\xff\x4b\x9b\xcb\xad\xfe\x91\x28\xf0\x01"
+        "\xc1\x33\xd0\x99\x99\x2e\x0c\x86\x84\x67\x4d\x37\xa4\x42\x45\x10"
+        "\xdc\x8f\xdb\x6f\xa6\x9b\xee\x8a\x60\xa5\x1f\x95\x3f\x8f\xf5\x31"
+        "\x4b\x1d\x48\x1e\x45\xff\x79\x5c\xbe\x72\xfc\x56\xed\x6d\x1a\x99"
+        "\x7f\x23\x7c\xd1\xa5\x50\x9e\xb0\x4d\x61\x37\xa5\xcb\x24\x71\x3b"
+        "\xa3\x60\x51\x2e\x80\x83\x8b\xe0\x55\x50\xa7\x1e\xcc\x9f\xac\x41"
+        "\x77\x2c\x79\x22\x30\x09\x1b\x1a\x83\x5b\x2c\x48\xdc\x09\x7d\x59"
+        "\x0d\xf0\x54\x17\xfb\x5e\x38\x68\xde\xdb\xc5\x93\xab\x17\x5f\x4b"
+        "\x4d\x6d\xf2\xc7\x4e\x15\x1e\x10\x76\xc4\xcb\x87\xd8\xb7\x9d\xa8"
+        "\xbf\xc5\x2e\x5e\xfc\xd3\x6c\x45\xd4\x5d\x72\x0f\x66\xeb\x67\x86"
+        "\xfa\x6c\xd6\x80\xa4\x23\xcb\x5d\xed\x3c\xde\xdc\x5b\x3d\xca\x95"
+        "\x43\x4b\xdc\xe8\x49\xd3\xe1\x01\xd4\xf1\xe4\x47\xcf\x56\xba\x71"
+        "\xb4\x69\xed\xe7\xdb\x0f\x89\xd6\xbb\xcd\x1a\xff\xb4\xbe\x72\x26"
+        "\xdc\x76\x79\xb3\x1a\x4b\xe6\x8d\x9b\x8e\xd9\xe9\xe6\xf9\xff\xa5";
+
+    a.input  = "";
+    a.output = "\x7f\x9c\x2b\xa4\xe8\x8f\x82\x7d\x61\x60\x45\x50\x76\x05\x85"
+               "\x3e\xd7\x3b\x80\x93\xf6\xef\xbc\x88\xeb\x1a\x6e\xac\xfa\x66"
+               "\xef\x26\x3c\xb1\xee\xa9\x88\x00\x4b\x93\x10\x3c\xfb\x0a\xee"
+               "\xfd\x2a\x68\x6e\x01\xfa\x4a\x58\xe8\xa3\x63\x9c\xa8\xa1\xe3"
+               "\xf9\xae\x57\xe2\x35\xb8\xcc\x87\x3c\x23\xdc\x62\xb8\xd2\x60"
+               "\x16\x9a\xfa\x2f\x75\xab\x91\x6a\x58\xd9\x74\x91\x88\x35\xd2"
+               "\x5e\x6a\x43\x50\x85\xb2\xba\xdf\xd6\xdf\xaa\xc3\x59\xa5\xef"
+               "\xbb\x7b\xcc\x4b\x59\xd5\x38\xdf\x9a\x04\x30\x2e\x10\xc8\xbc"
+               "\x1c\xbf\x1a\x0b\x3a\x51\x20\xea\x17\xcd\xa7\xcf\xad\x76\x5f"
+               "\x56\x23\x47\x4d\x36\x8c\xcc\xa8\xaf\x00\x07\xcd\x9f\x5e\x4c"
+               "\x84\x9f\x16\x7a\x58\x0b\x14\xaa\xbd\xef\xae\xe7\xee\xf4\x7c"
+               "\xb0\xfc\xa9";
+    a.inLen  = XSTRLEN(a.input);
+    a.outLen = WC_SHA3_128_BLOCK_SIZE;
+
+    b.input  = "abc";
+    b.output = "\x58\x81\x09\x2d\xd8\x18\xbf\x5c\xf8\xa3\xdd\xb7\x93\xfb\xcb"
+               "\xa7\x40\x97\xd5\xc5\x26\xa6\xd3\x5f\x97\xb8\x33\x51\x94\x0f"
+               "\x2c\xc8\x44\xc5\x0a\xf3\x2a\xcd\x3f\x2c\xdd\x06\x65\x68\x70"
+               "\x6f\x50\x9b\xc1\xbd\xde\x58\x29\x5d\xae\x3f\x89\x1a\x9a\x0f"
+               "\xca\x57\x83\x78\x9a\x41\xf8\x61\x12\x14\xce\x61\x23\x94\xdf"
+               "\x28\x6a\x62\xd1\xa2\x25\x2a\xa9\x4d\xb9\xc5\x38\x95\x6c\x71"
+               "\x7d\xc2\xbe\xd4\xf2\x32\xa0\x29\x4c\x85\x7c\x73\x0a\xa1\x60"
+               "\x67\xac\x10\x62\xf1\x20\x1f\xb0\xd3\x77\xcf\xb9\xcd\xe4\xc6"
+               "\x35\x99\xb2\x7f\x34\x62\xbb\xa4\xa0\xed\x29\x6c\x80\x1f\x9f"
+               "\xf7\xf5\x73\x02\xbb\x30\x76\xee\x14\x5f\x97\xa3\x2a\xe6\x8e"
+               "\x76\xab\x66\xc4\x8d\x51\x67\x5b\xd4\x9a\xcc\x29\x08\x2f\x56"
+               "\x47\x58\x4e";
+    b.inLen  = XSTRLEN(b.input);
+    b.outLen = WC_SHA3_128_BLOCK_SIZE;
+
+    c.input  = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    c.output = "\x1a\x96\x18\x2b\x50\xfb\x8c\x7e\x74\xe0\xa7\x07\x78\x8f\x55"
+               "\xe9\x82\x09\xb8\xd9\x1f\xad\xe8\xf3\x2f\x8d\xd5\xcf\xf7\xbf"
+               "\x21\xf5\x4e\xe5\xf1\x95\x50\x82\x5a\x6e\x07\x00\x30\x51\x9e"
+               "\x94\x42\x63\xac\x1c\x67\x65\x28\x70\x65\x62\x1f\x9f\xcb\x32"
+               "\x01\x72\x3e\x32\x23\xb6\x3a\x46\xc2\x93\x8a\xa9\x53\xba\x84"
+               "\x01\xd0\xea\x77\xb8\xd2\x64\x90\x77\x55\x66\x40\x7b\x95\x67"
+               "\x3c\x0f\x4c\xc1\xce\x9f\xd9\x66\x14\x8d\x7e\xfd\xff\x26\xbb"
+               "\xf9\xf4\x8a\x21\xc6\xda\x35\xbf\xaa\x54\x56\x54\xf7\x0a\xe5"
+               "\x86\xff\x10\x13\x14\x20\x77\x14\x83\xec\x92\xed\xab\x40\x8c"
+               "\x76\x7b\xf4\xc5\xb4\xff\xfa\xa8\x0c\x8c\xa2\x14\xd8\x4c\x4d"
+               "\xc7\x00\xd0\xc5\x06\x30\xb2\xff\xc3\x79\x3e\xa4\xd8\x72\x58"
+               "\xb4\xc9\x54";
+    c.inLen  = XSTRLEN(c.input);
+    c.outLen = WC_SHA3_128_BLOCK_SIZE;
+
+    /* Taken from NIST CAVP test vectors - full rate output. */
+    d.input  = "\xdc\x88\x6d\xf3\xf6\x9c\x49\x51\x3d\xe3\x62\x7e\x94\x81\xdb"
+               "\x58\x71\xe8\xee\x88\xeb\x9f\x99\x61\x15\x41\x93\x0a\x8b\xc8"
+               "\x85\xe0";
+    d.output = "\x93\x68\xf0\x15\x10\x92\x44\xeb\x02\x47\xfa\x3a\x0e\x57\xf5"
+               "\x2e\xa7\xd9\xeb\xa2\x3d\xae\x7a\x19\x7f\x0a\x29\xe9\x22\x55"
+               "\x06\x05\x98\x16\xb7\x84\x48\xb6\x49\x7a\x76\xeb\x96\x2d\xb3"
+               "\xf8\x4d\x37\x60\xf1\xfe\xb4\xbd\xc1\xfd\x4a\xc9\x4e\x91\x7a"
+               "\xc2\xea\x5e\x4f\x38\x37\x4a\xa5\x6e\x4f\x47\x67\xb8\xd7\x83"
+               "\x1b\x2d\x51\x49\x5a\xb8\xea\xb7\xc9\x82\x20\xaf\x13\x41\x5a"
+               "\x59\xbb\x7c\x17\x7a\xcd\x62\x8e\xf0\xff\xe3\x6c\xeb\x18\x59"
+               "\x5d\x14\x4c\xbf\x25\xef\xc0\x6c\xd9\x56\xa5\x78\x20\x6e\xa8"
+               "\xf9\x14\x5e\xf9\xce\x19\x50\x6a\x9d\x04\x4e\xc7\x00\x79\x9f"
+               "\xa1\x41\x9b\xaf\x60\x52\xc0\xc1\xb4\x45\xf8\x35\x17\x57\xb0"
+               "\xd0\x22\x87\x21\x89\xe2\xc0\x27\x3f\x82\xd9\x69\x69\x66\x3e"
+               "\x55\x4d\x09";
+    d.inLen  = 32;
+    d.outLen = WC_SHA3_128_BLOCK_SIZE;
+    /* Taken from NIST CAVP test vectors - more than one output block. */
+    e.input  = "\x8d\x80\x01\xe2\xc0\x96\xf1\xb8\x8e\x7c\x92\x24\xa0\x86\xef"
+               "\xd4\x79\x7f\xbf\x74\xa8\x03\x3a\x2d\x42\x2a\x2b\x6b\x8f\x67"
+               "\x47\xe4";
+    e.output = "\xe1\x7e\xab\x0d\xa4\x04\xf9\xb6\xac\xc0\x84\x97\x2f\xc5\x79"
+               "\xe8\x6d\xaa\x76\x10\xa5\xe1\x7c\x23\x2f\x79\x19\x83\x96\xfd"
+               "\x01\xc2\x4c\x34\xbb\x54\xf4\xb0\x1e\xf7\x40\xb4\x25\x33\x4a"
+               "\x55\xdd\x24\x81\x3d\xc8\xea\x86\xf5\x6e\xf7\x27\x67\x26\x2b"
+               "\xf2\x25\x74\x8c\xcc\x3d\x9f\x48\x6f\xfb\x72\x8f\x4e\xad\x29"
+               "\x60\xc9\x6c\x3e\x44\x63\x86\xea\xce\x21\x9c\x84\x28\x16\x11"
+               "\x63\x58\xb0\xf4\x2d\x7d\xff\xf7\xdd\x24\x11\xfa\x2a\x56\x79"
+               "\xfd\x7a\x94\x77\x45\x75\xba\xf9\xfc\xad\x68\xa1\x9e\x30\xd1"
+               "\x49\xb0\x59\xb5\x9c\x44\x6c\x4e\xdc\xa5\x9b\xc5\xa4\x79\x9d"
+               "\xc4\x65\xaa\x9e\x78\x2c\xed\x9f\x21\xc5\x5d\xe2\x42\xdd\x25"
+               "\xd0\xd9\xde\x60\xd0\x9f\xf8\x6a\xba\xf3\xa0\x3a\x76\x71\xb3"
+               "\x05\x42\xdf\xbe\x72\xfc\x56\xed\x6d\x1a\x99\x7f\x23\x7c\xd1"
+               "\xa5\x50\x9e\xb0\x4d\x61\x37\xa5\xcb\x24\x71\x3b\xa3\x60\x51"
+               "\x2e\x80\x83\x8b\xe0\x55\x50\xa7\x1e\xcc\x9f\xac\x41\x77\x2c"
+               "\x79\x22\x30\x09\x1b\x1a\x83\x5b\x2c\x48\xdc\x09\x7d\x59\x0d"
+               "\xf0\x54\x17\xfb\x5e\x38\x68\xde\xdb\xc5\x93\xab\x17\x5f\x4b"
+               "\x4d\x6d\xf2\xc7\x4e\x15\x1e\x10\x76\xc4\xcb\x87\xd8\xb7\x9d"
+               "\xa8\xbf\xc5\x2e\x5e\xfc\xd3\x6c\x45\xd4\x5d\x72\x0f\x66\xeb"
+               "\x67\x86\xfa\x6c\xd6\x80\xa4\x23\xcb\x5d\xed\x3c\xde\xdc\x5b"
+               "\x3d\xca\x95\x43\x4b\xdc\xe8\x49\xd3\xe1\x01\xd4\xf1\xe4\x47"
+               "\xcf\x56\xba\x71\xb4\x69\xed\xe7\xdb\x0f\x89\xd6\xbb\xcd\x1a"
+               "\xff\xb4\xbe\x72\x26\xdc\x76\x79\xb3\x1a\x4b\xe6\x8d\x9b\x8e"
+               "\xd9\xe9\xe6\xf9\xff\xa5";
+    e.inLen  = 32;
+    e.outLen = 2 * WC_SHA3_128_BLOCK_SIZE;
+
+    test_sha[0] = a;
+    test_sha[1] = b;
+    test_sha[2] = c;
+    test_sha[3] = d;
+    test_sha[4] = e;
+
+    for (i = 0; i < times; ++i) {
+        ret = wc_InitShake128(sha, HEAP_HINT, devId);
+        if (ret != 0)
+            ERROR_OUT(-3100 - i, exit);
+        ret = wc_Shake128_Absorb(sha, (byte*)test_sha[i].input,
+            (word32)test_sha[i].inLen);
+        if (ret != 0)
+            ERROR_OUT(-3101 - i, exit);
+        ret = wc_Shake128_SqueezeBlocks(sha, hash,
+            (word32)test_sha[i].outLen / WC_SHA3_128_BLOCK_SIZE);
+        if (ret != 0)
+            ERROR_OUT(-3102 - i, exit);
+
+        if (XMEMCMP(hash, test_sha[i].output, (word32)test_sha[i].outLen) != 0)
+            ERROR_OUT(-3103 - i, exit);
+    }
+
+    /* BEGIN LARGE HASH TEST */ {
+    for (i = 0; i < (int)sizeof(large_input); i++) {
+        large_input[i] = (byte)(i & 0xFF);
+    }
+    ret = wc_InitShake128(sha, HEAP_HINT, devId);
+    if (ret != 0)
+        ERROR_OUT(-3104, exit);
+    /* Absorb is non-incremental. */
+    ret = wc_Shake128_Absorb(sha, (byte*)large_input,
+        (word32)sizeof(large_input));
+    if (ret != 0)
+        ERROR_OUT(-3105, exit);
+    /* Able to squeeze out blocks incrementally. */
+    ret = wc_Shake128_SqueezeBlocks(sha, hash, 1);
+    if (ret != 0)
+        ERROR_OUT(-3106, exit);
+    ret = wc_Shake128_SqueezeBlocks(sha, hash,
+        ((word32)sizeof(hash) / WC_SHA3_128_BLOCK_SIZE) - 1);
+    if (ret != 0)
+        ERROR_OUT(-3106, exit);
+    if (XMEMCMP(hash, large_digest, sizeof(hash)) != 0)
+        ERROR_OUT(-3107, exit);
+    } /* END LARGE HASH TEST */
+
+exit:
+    return ret;
+}
+
+WOLFSSL_TEST_SUBROUTINE int shake128_test(void)
+{
+    wc_Shake  sha;
+    byte  hash[250];
+
+    testVector a, b, c, d, e;
+    testVector test_sha[5];
+    int ret = 0;
+    int times = sizeof(test_sha) / sizeof(struct testVector), i;
+
+    byte large_input[1024];
+    const char* large_digest =
+        "\x88\xd7\x0e\x86\x46\x72\x6b\x3d\x7d\x22\xe1\xa9\x2d\x02\xdb\x35"
+        "\x92\x4f\x1b\x03\x90\xee\xa3\xce\xd1\x3a\x08\x3a\xd7\x4e\x10\xdf"
+        "\x09\x67\x33\x35\x4f\xdd\x38\x50\x5b\xcb\x75\xc7\xba\x65\xe5\xe8"
+        "\xb8\x76\xde\xc5\xee\xd7\xf1\x65\x93\x4e\x5e\xc4\xb1\xd7\x6b\xee"
+        "\x4b\x57\x48\xf5\x38\x49\x9e\x45\xa0\xf7\x32\xe9\x05\x26\x6a\x10"
+        "\x70\xd4\x7c\x19\x01\x1f\x6d\x37\xba\x7b\x74\xc2\xbc\xb6\xbc\x74"
+        "\xa3\x66\x6c\x9b\x11\x84\x9d\x4a\x36\xbc\x8a\x0d\x4c\xe3\x39\xfa"
+        "\xfa\x1b";
+
+    a.input  = "";
+    a.output = "\x7f\x9c\x2b\xa4\xe8\x8f\x82\x7d\x61\x60\x45\x50\x76\x05\x85"
+               "\x3e\xd7\x3b\x80\x93\xf6\xef\xbc\x88\xeb\x1a\x6e\xac\xfa\x66"
+               "\xef\x26\x3c\xb1\xee\xa9\x88\x00\x4b\x93\x10\x3c\xfb\x0a\xee"
+               "\xfd\x2a\x68\x6e\x01\xfa\x4a\x58\xe8\xa3\x63\x9c\xa8\xa1\xe3"
+               "\xf9\xae\x57\xe2\x35\xb8\xcc\x87\x3c\x23\xdc\x62\xb8\xd2\x60"
+               "\x16\x9a\xfa\x2f\x75\xab\x91\x6a\x58\xd9\x74\x91\x88\x35\xd2"
+               "\x5e\x6a\x43\x50\x85\xb2\xba\xdf\xd6\xdf\xaa\xc3\x59\xa5\xef"
+               "\xbb\x7b\xcc\x4b\x59\xd5\x38\xdf\x9a";
+    a.inLen  = XSTRLEN(a.input);
+    a.outLen = 114;
+
+    b.input  = "abc";
+    b.output = "\x58\x81\x09\x2d\xd8\x18\xbf\x5c\xf8\xa3\xdd\xb7\x93\xfb\xcb"
+               "\xa7\x40\x97\xd5\xc5\x26\xa6\xd3\x5f\x97\xb8\x33\x51\x94\x0f"
+               "\x2c\xc8\x44\xc5\x0a\xf3\x2a\xcd\x3f\x2c\xdd\x06\x65\x68\x70"
+               "\x6f\x50\x9b\xc1\xbd\xde\x58\x29\x5d\xae\x3f\x89\x1a\x9a\x0f"
+               "\xca\x57\x83\x78\x9a\x41\xf8\x61\x12\x14\xce\x61\x23\x94\xdf"
+               "\x28\x6a\x62\xd1\xa2\x25\x2a\xa9\x4d\xb9\xc5\x38\x95\x6c\x71"
+               "\x7d\xc2\xbe\xd4\xf2\x32\xa0\x29\x4c\x85\x7c\x73\x0a\xa1\x60"
+               "\x67\xac\x10\x62\xf1\x20\x1f\xb0\xd3";
+    b.inLen  = XSTRLEN(b.input);
+    b.outLen = 114;
+
+    c.input  = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    c.output = "\x1a\x96\x18\x2b\x50\xfb\x8c\x7e\x74\xe0\xa7\x07\x78\x8f\x55"
+               "\xe9\x82\x09\xb8\xd9\x1f\xad\xe8\xf3\x2f\x8d\xd5\xcf\xf7\xbf"
+               "\x21\xf5\x4e\xe5\xf1\x95\x50\x82\x5a\x6e\x07\x00\x30\x51\x9e"
+               "\x94\x42\x63\xac\x1c\x67\x65\x28\x70\x65\x62\x1f\x9f\xcb\x32"
+               "\x01\x72\x3e\x32\x23\xb6\x3a\x46\xc2\x93\x8a\xa9\x53\xba\x84"
+               "\x01\xd0\xea\x77\xb8\xd2\x64\x90\x77\x55\x66\x40\x7b\x95\x67"
+               "\x3c\x0f\x4c\xc1\xce\x9f\xd9\x66\x14\x8d\x7e\xfd\xff\x26\xbb"
+               "\xf9\xf4\x8a\x21\xc6\xda\x35\xbf\xaa";
+    c.inLen  = XSTRLEN(c.input);
+    c.outLen = 114;
+
+    /* Taken from NIST CAVP test vectors - full rate output. */
+    d.input  = "\xdc\x88\x6d\xf3\xf6\x9c\x49\x51\x3d\xe3\x62\x7e\x94\x81\xdb"
+               "\x58\x71\xe8\xee\x88\xeb\x9f\x99\x61\x15\x41\x93\x0a\x8b\xc8"
+               "\x85\xe0";
+    d.output = "\x93\x68\xf0\x15\x10\x92\x44\xeb\x02\x47\xfa\x3a\x0e\x57\xf5"
+               "\x2e\xa7\xd9\xeb\xa2\x3d\xae\x7a\x19\x7f\x0a\x29\xe9\x22\x55"
+               "\x06\x05\x98\x16\xb7\x84\x48\xb6\x49\x7a\x76\xeb\x96\x2d\xb3"
+               "\xf8\x4d\x37\x60\xf1\xfe\xb4\xbd\xc1\xfd\x4a\xc9\x4e\x91\x7a"
+               "\xc2\xea\x5e\x4f\x38\x37\x4a\xa5\x6e\x4f\x47\x67\xb8\xd7\x83"
+               "\x1b\x2d\x51\x49\x5a\xb8\xea\xb7\xc9\x82\x20\xaf\x13\x41\x5a"
+               "\x59\xbb\x7c\x17\x7a\xcd\x62\x8e\xf0\xff\xe3\x6c\xeb\x18\x59"
+               "\x5d\x14\x4c\xbf\x25\xef\xc0\x6c\xd9\x56\xa5\x78\x20\x6e\xa8"
+               "\xf9\x14\x5e\xf9\xce\x19\x50\x6a\x9d\x04\x4e\xc7\x00\x79\x9f"
+               "\xa1";
+    d.inLen  = 32;
+    d.outLen = 136;
+    /* Taken from NIST CAVP test vectors - more than one output block. */
+    e.input  = "\x8d\x80\x01\xe2\xc0\x96\xf1\xb8\x8e\x7c\x92\x24\xa0\x86\xef"
+               "\xd4\x79\x7f\xbf\x74\xa8\x03\x3a\x2d\x42\x2a\x2b\x6b\x8f\x67"
+               "\x47\xe4";
+    e.output = "\xe1\x7e\xab\x0d\xa4\x04\xf9\xb6\xac\xc0\x84\x97\x2f\xc5\x79"
+               "\xe8\x6d\xaa\x76\x10\xa5\xe1\x7c\x23\x2f\x79\x19\x83\x96\xfd"
+               "\x01\xc2\x4c\x34\xbb\x54\xf4\xb0\x1e\xf7\x40\xb4\x25\x33\x4a"
+               "\x55\xdd\x24\x81\x3d\xc8\xea\x86\xf5\x6e\xf7\x27\x67\x26\x2b"
+               "\xf2\x25\x74\x8c\xcc\x3d\x9f\x48\x6f\xfb\x72\x8f\x4e\xad\x29"
+               "\x60\xc9\x6c\x3e\x44\x63\x86\xea\xce\x21\x9c\x84\x28\x16\x11"
+               "\x63\x58\xb0\xf4\x2d\x7d\xff\xf7\xdd\x24\x11\xfa\x2a\x56\x79"
+               "\xfd\x7a\x94\x77\x45\x75\xba\xf9\xfc\xad\x68\xa1\x9e\x30\xd1"
+               "\x49\xb0\x59\xb5\x9c\x44\x6c\x4e\xdc\xa5\x9b\xc5\xa4\x79\x9d"
+               "\xc4\x65\xaa\x9e\x78\x2c\xed\x9f\x21\xc5\x5d\xe2\x42\xdd\x25"
+               "\xd0\xd9\xde\x60\xd0\x9f\xf8\x6a\xba\xf3\xa0\x3a\x76\x71\xb3"
+               "\x05\x42\xdf\xbe\x72\xfc\x56\xed\x6d\x1a\x99\x7f\x23\x7c\xd1"
+               "\xa5\x50\x9e\xb0\x4d\x61\x37\xa5\xcb\x24\x71\x3b\xa3\x60\x51"
+               "\x2e\x80\x83\x8b\xe0\x55\x50\xa7\x1e\xcc\x9f\xac\x41\x77\x2c"
+               "\x79\x22\x30\x09\x1b\x1a\x83\x5b\x2c\x48\xdc\x09\x7d\x59\x0d"
+               "\xf0\x54\x17\xfb\x5e\x38\x68\xde\xdb\xc5\x93\xab\x17\x5f\x4b"
+               "\x4d\x6d\xf2\xc7\x4e\x15\x1e\x10\x76\xc4";
+    e.inLen  = 32;
+    e.outLen = 250;
+
+    test_sha[0] = a;
+    test_sha[1] = b;
+    test_sha[2] = c;
+    test_sha[3] = d;
+    test_sha[4] = e;
+
+    ret = wc_InitShake128(&sha, HEAP_HINT, devId);
+    if (ret != 0)
+        return -3100;
+
+    for (i = 0; i < times; ++i) {
+        ret = wc_Shake128_Update(&sha, (byte*)test_sha[i].input,
+            (word32)test_sha[i].inLen);
+        if (ret != 0)
+            ERROR_OUT(-3101 - i, exit);
+        ret = wc_Shake128_Final(&sha, hash, (word32)test_sha[i].outLen);
+        if (ret != 0)
+            ERROR_OUT(-3102 - i, exit);
+
+        if (XMEMCMP(hash, test_sha[i].output, test_sha[i].outLen) != 0)
+            ERROR_OUT(-3103 - i, exit);
+    }
+
+    /* BEGIN LARGE HASH TEST */ {
+    for (i = 0; i < (int)sizeof(large_input); i++) {
+        large_input[i] = (byte)(i & 0xFF);
+    }
+    times = 100;
+    for (i = 0; i < times; ++i) {
+        ret = wc_Shake128_Update(&sha, (byte*)large_input,
+            (word32)sizeof(large_input));
+        if (ret != 0)
+            ERROR_OUT(-3104, exit);
+    }
+    ret = wc_Shake128_Final(&sha, hash, (word32)sizeof(hash));
+    if (ret != 0)
+        ERROR_OUT(-3105, exit);
+    if (XMEMCMP(hash, large_digest, 114) != 0)
+        ERROR_OUT(-3106, exit);
+    } /* END LARGE HASH TEST */
+
+    ret = shake128_absorb_test(&sha);
+
+exit:
+    wc_Shake128_Free(&sha);
+
+    return ret;
+}
+#endif
+
 #ifdef WOLFSSL_SHAKE256
+static int shake256_absorb_test(wc_Shake* sha)
+{
+    byte  hash[WC_SHA3_256_BLOCK_SIZE*2];
+
+    testVector a, b, c, d, e;
+    testVector test_sha[5];
+    int ret = 0;
+    int times = sizeof(test_sha) / sizeof(struct testVector), i;
+
+    byte large_input[1024];
+    const char* large_digest =
+        "\x21\x25\x8e\xae\x6e\x4f\xa7\xe1\xb9\x6d\xa7\xc9\x7d\x46\x03\x69"
+        "\x29\x0d\x81\x49\xba\x5d\xaf\x37\xfd\xeb\x25\x52\x1d\xd9\xbd\x65"
+        "\xfa\x99\xb9\xd1\x70\x6b\xeb\xd4\xc1\x2c\xea\x24\x20\x27\xa7\xcd"
+        "\xfa\xe1\x81\xd9\xd5\xc1\x1c\xc7\xe9\x70\xc3\xc7\x21\x6f\x32\x22"
+        "\xe3\x27\xdb\x58\x5e\xea\x18\x2d\x63\x4d\x14\x6c\x94\xcf\x2b\x7e"
+        "\x6e\x2a\x74\xf3\xe0\xac\xb3\xb2\xcc\xef\x38\xe9\xe7\x35\xb3\xc5"
+        "\x77\x9d\xff\xe3\x08\x8e\xf8\x2c\x89\xbb\x45\x22\x16\x99\x91\xc0"
+        "\xe7\x71\x57\x75\xc5\xb1\xc6\xaf\x27\xcb\x64\x8c\xc4\xee\x3d\x5f"
+        "\x4c\x35\xfb\x1c\xf3\xf8\x0e\xfd\x5e\xfc\x07\xd8\x4d\x55\x32\x49"
+        "\x45\x0d\xab\x4a\x49\xc4\x83\xde\xd2\x50\xc9\x33\x8f\x85\xcd\x93"
+        "\x7a\xe6\x6b\xb4\x36\xf3\xb4\x02\x6e\x85\x9f\xda\x1c\xa5\x71\x43"
+        "\x2f\x3b\xfc\x09\xe7\xc0\x3c\xa4\xd1\x83\xb7\x41\x11\x1c\xa0\x48"
+        "\x3d\x0e\xda\xbc\x03\xfe\xb2\x3b\x17\xee\x48\xe8\x44\xba\x24\x08"
+        "\xd9\xdc\xfd\x01\x39\xd2\xe8\xc7\x31\x01\x25\xae\xe8\x01\xc6\x1a"
+        "\xb7\x90\x0d\x1e\xfc\x47\xc0\x78\x28\x17\x66\xf3\x61\xc5\xe6\x11"
+        "\x13\x46\x23\x5e\x1d\xc3\x83\x25\x66\x6c\x68\x1b\x30\xdd\xc4\xe6"
+        "\x83\x8b\x0f\x23\x58\x7e\x06\x5f\x4a\x2b\xed\xc9\x6c\x97\x68\x44";
+
+    a.input  = "";
+    a.output = "\x46\xb9\xdd\x2b\x0b\xa8\x8d\x13\x23\x3b\x3f\xeb\x74\x3e\xeb"
+               "\x24\x3f\xcd\x52\xea\x62\xb8\x1b\x82\xb5\x0c\x27\x64\x6e\xd5"
+               "\x76\x2f\xd7\x5d\xc4\xdd\xd8\xc0\xf2\x00\xcb\x05\x01\x9d\x67"
+               "\xb5\x92\xf6\xfc\x82\x1c\x49\x47\x9a\xb4\x86\x40\x29\x2e\xac"
+               "\xb3\xb7\xc4\xbe\x14\x1e\x96\x61\x6f\xb1\x39\x57\x69\x2c\xc7"
+               "\xed\xd0\xb4\x5a\xe3\xdc\x07\x22\x3c\x8e\x92\x93\x7b\xef\x84"
+               "\xbc\x0e\xab\x86\x28\x53\x34\x9e\xc7\x55\x46\xf5\x8f\xb7\xc2"
+               "\x77\x5c\x38\x46\x2c\x50\x10\xd8\x46\xc1\x85\xc1\x51\x11\xe5"
+               "\x95\x52\x2a\x6b\xcd\x16\xcf\x86\xf3\xd1\x22\x10\x9e\x3b\x1f"
+               "\xdd";
+    a.inLen  = XSTRLEN(a.input);
+    a.outLen = WC_SHA3_256_BLOCK_SIZE;
+
+    b.input  = "abc";
+    b.output = "\x48\x33\x66\x60\x13\x60\xa8\x77\x1c\x68\x63\x08\x0c\xc4\x11"
+               "\x4d\x8d\xb4\x45\x30\xf8\xf1\xe1\xee\x4f\x94\xea\x37\xe7\x8b"
+               "\x57\x39\xd5\xa1\x5b\xef\x18\x6a\x53\x86\xc7\x57\x44\xc0\x52"
+               "\x7e\x1f\xaa\x9f\x87\x26\xe4\x62\xa1\x2a\x4f\xeb\x06\xbd\x88"
+               "\x01\xe7\x51\xe4\x13\x85\x14\x12\x04\xf3\x29\x97\x9f\xd3\x04"
+               "\x7a\x13\xc5\x65\x77\x24\xad\xa6\x4d\x24\x70\x15\x7b\x3c\xdc"
+               "\x28\x86\x20\x94\x4d\x78\xdb\xcd\xdb\xd9\x12\x99\x3f\x09\x13"
+               "\xf1\x64\xfb\x2c\xe9\x51\x31\xa2\xd0\x9a\x3e\x6d\x51\xcb\xfc"
+               "\x62\x27\x20\xd7\xa7\x5c\x63\x34\xe8\xa2\xd7\xec\x71\xa7\xcc"
+               "\x29";
+    b.inLen  = XSTRLEN(b.input);
+    b.outLen = WC_SHA3_256_BLOCK_SIZE;
+
+    c.input  = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    c.output = "\x4d\x8c\x2d\xd2\x43\x5a\x01\x28\xee\xfb\xb8\xc3\x6f\x6f\x87"
+               "\x13\x3a\x79\x11\xe1\x8d\x97\x9e\xe1\xae\x6b\xe5\xd4\xfd\x2e"
+               "\x33\x29\x40\xd8\x68\x8a\x4e\x6a\x59\xaa\x80\x60\xf1\xf9\xbc"
+               "\x99\x6c\x05\xac\xa3\xc6\x96\xa8\xb6\x62\x79\xdc\x67\x2c\x74"
+               "\x0b\xb2\x24\xec\x37\xa9\x2b\x65\xdb\x05\x39\xc0\x20\x34\x55"
+               "\xf5\x1d\x97\xcc\xe4\xcf\xc4\x91\x27\xd7\x26\x0a\xfc\x67\x3a"
+               "\xf2\x08\xba\xf1\x9b\xe2\x12\x33\xf3\xde\xbe\x78\xd0\x67\x60"
+               "\xcf\xa5\x51\xee\x1e\x07\x91\x41\xd4\x9d\xd3\xef\x7e\x18\x2b"
+               "\x15\x24\xdf\x82\xea\x1c\xef\xe1\xc6\xc3\x96\x61\x75\xf0\x22"
+               "\x8d";
+    c.inLen  = XSTRLEN(c.input);
+    c.outLen = WC_SHA3_256_BLOCK_SIZE;
+
+    /* Taken from NIST CAVP test vectors - full rate output. */
+    d.input  = "\xdc\x88\x6d\xf3\xf6\x9c\x49\x51\x3d\xe3\x62\x7e\x94\x81\xdb"
+               "\x58\x71\xe8\xee\x88\xeb\x9f\x99\x61\x15\x41\x93\x0a\x8b\xc8"
+               "\x85\xe0";
+    d.output = "\x00\x64\x8a\xfb\xc5\xe6\x51\x64\x9d\xb1\xfd\x82\x93\x6b\x00"
+               "\xdb\xbc\x12\x2f\xb4\xc8\x77\x86\x0d\x38\x5c\x49\x50\xd5\x6d"
+               "\xe7\xe0\x96\xd6\x13\xd7\xa3\xf2\x7e\xd8\xf2\x63\x34\xb0\xcc"
+               "\xc1\x40\x7b\x41\xdc\xcb\x23\xdf\xaa\x52\x98\x18\xd1\x12\x5c"
+               "\xd5\x34\x80\x92\x52\x43\x66\xb8\x5f\xab\xb9\x7c\x6c\xd1\xe6"
+               "\x06\x6f\x45\x9b\xcc\x56\x6d\xa8\x7e\xc9\xb7\xba\x36\x79\x2d"
+               "\x11\x8a\xc3\x9a\x4c\xce\xf6\x19\x2b\xbf\x3a\x54\xaf\x18\xe5"
+               "\x7b\x0c\x14\x61\x01\xf6\xae\xaa\x82\x2b\xc4\xb4\xc9\x70\x8b"
+               "\x09\xf0\xb3\xba\xb4\x1b\xcc\xe9\x64\xd9\x99\xd1\x10\x7b\xd7"
+               "\xc2";
+    d.inLen  = 32;
+    d.outLen = WC_SHA3_256_BLOCK_SIZE;
+    /* Taken from NIST CAVP test vectors - more than one output block. */
+    e.input  = "\x8d\x80\x01\xe2\xc0\x96\xf1\xb8\x8e\x7c\x92\x24\xa0\x86\xef"
+               "\xd4\x79\x7f\xbf\x74\xa8\x03\x3a\x2d\x42\x2a\x2b\x6b\x8f\x67"
+               "\x47\xe4";
+    e.output = "\x2e\x97\x5f\x6a\x8a\x14\xf0\x70\x4d\x51\xb1\x36\x67\xd8\x19"
+               "\x5c\x21\x9f\x71\xe6\x34\x56\x96\xc4\x9f\xa4\xb9\xd0\x8e\x92"
+               "\x25\xd3\xd3\x93\x93\x42\x51\x52\xc9\x7e\x71\xdd\x24\x60\x1c"
+               "\x11\xab\xcf\xa0\xf1\x2f\x53\xc6\x80\xbd\x3a\xe7\x57\xb8\x13"
+               "\x4a\x9c\x10\xd4\x29\x61\x58\x69\x21\x7f\xdd\x58\x85\xc4\xdb"
+               "\x17\x49\x85\x70\x3a\x6d\x6d\xe9\x4a\x66\x7e\xac\x30\x23\x44"
+               "\x3a\x83\x37\xae\x1b\xc6\x01\xb7\x6d\x7d\x38\xec\x3c\x34\x46"
+               "\x31\x05\xf0\xd3\x94\x9d\x78\xe5\x62\xa0\x39\xe4\x46\x95\x48"
+               "\xb6\x09\x39\x5d\xe5\xa4\xfd\x43\xc4\x6c\xa9\xfd\x6e\xe2\x9a"
+               "\xda\x5e\xfc\x07\xd8\x4d\x55\x32\x49\x45\x0d\xab\x4a\x49\xc4"
+               "\x83\xde\xd2\x50\xc9\x33\x8f\x85\xcd\x93\x7a\xe6\x6b\xb4\x36"
+               "\xf3\xb4\x02\x6e\x85\x9f\xda\x1c\xa5\x71\x43\x2f\x3b\xfc\x09"
+               "\xe7\xc0\x3c\xa4\xd1\x83\xb7\x41\x11\x1c\xa0\x48\x3d\x0e\xda"
+               "\xbc\x03\xfe\xb2\x3b\x17\xee\x48\xe8\x44\xba\x24\x08\xd9\xdc"
+               "\xfd\x01\x39\xd2\xe8\xc7\x31\x01\x25\xae\xe8\x01\xc6\x1a\xb7"
+               "\x90\x0d\x1e\xfc\x47\xc0\x78\x28\x17\x66\xf3\x61\xc5\xe6\x11"
+               "\x13\x46\x23\x5e\x1d\xc3\x83\x25\x66\x6c\x68\x1b\x30\xdd\xc4"
+               "\xe6\x83\x8b\x0f\x23\x58\x7e\x06\x5f\x4a\x2b\xed\xc9\x6c\x97"
+               "\x68\x44";
+    e.inLen  = 32;
+    e.outLen = 2 * WC_SHA3_256_BLOCK_SIZE;
+
+    test_sha[0] = a;
+    test_sha[1] = b;
+    test_sha[2] = c;
+    test_sha[3] = d;
+    test_sha[4] = e;
+
+    for (i = 0; i < times; ++i) {
+        ret = wc_InitShake256(sha, HEAP_HINT, devId);
+        if (ret != 0)
+            ERROR_OUT(-3100 - i, exit);
+        ret = wc_Shake256_Absorb(sha, (byte*)test_sha[i].input,
+            (word32)test_sha[i].inLen);
+        if (ret != 0)
+            ERROR_OUT(-3101 - i, exit);
+        ret = wc_Shake256_SqueezeBlocks(sha, hash,
+            (word32)test_sha[i].outLen / WC_SHA3_256_BLOCK_SIZE);
+        if (ret != 0)
+            ERROR_OUT(-3102 - i, exit);
+
+        if (XMEMCMP(hash, test_sha[i].output, (word32)test_sha[i].outLen) != 0)
+            ERROR_OUT(-3103 - i, exit);
+    }
+
+    /* BEGIN LARGE HASH TEST */ {
+    for (i = 0; i < (int)sizeof(large_input); i++) {
+        large_input[i] = (byte)(i & 0xFF);
+    }
+    ret = wc_InitShake256(sha, HEAP_HINT, devId);
+    if (ret != 0)
+        ERROR_OUT(-3104, exit);
+    /* Absorb is non-incremental. */
+    ret = wc_Shake256_Absorb(sha, (byte*)large_input,
+        (word32)sizeof(large_input));
+    if (ret != 0)
+        ERROR_OUT(-3105, exit);
+    /* Able to squeeze out blocks incrementally. */
+    ret = wc_Shake256_SqueezeBlocks(sha, hash, 1);
+    if (ret != 0)
+        ERROR_OUT(-3106, exit);
+    ret = wc_Shake256_SqueezeBlocks(sha, hash,
+        ((word32)sizeof(hash) / WC_SHA3_256_BLOCK_SIZE) - 1);
+    if (ret != 0)
+        ERROR_OUT(-3106, exit);
+    if (XMEMCMP(hash, large_digest, sizeof(hash)) != 0)
+        ERROR_OUT(-3107, exit);
+    } /* END LARGE HASH TEST */
+
+exit:
+    return ret;
+}
+
 WOLFSSL_TEST_SUBROUTINE int shake256_test(void)
 {
     wc_Shake  sha;
@@ -3630,6 +4130,7 @@ WOLFSSL_TEST_SUBROUTINE int shake256_test(void)
         ERROR_OUT(-3106, exit);
     } /* END LARGE HASH TEST */
 
+    ret = shake256_absorb_test(&sha);
 exit:
     wc_Shake256_Free(&sha);
 
@@ -8549,21 +9050,21 @@ static int aesecb_test(void)
         XMEMSET(cipher, 0, AES_BLOCK_SIZE);
         ret = wc_AesSetKey(enc, niKey, sizeof(niKey), cipher, AES_ENCRYPTION);
         if (ret != 0)
-            ERROR_OUT(-5943, out);
+            ERROR_OUT(-5923, out);
         if (wc_AesEcbEncrypt(enc, cipher, niPlain, AES_BLOCK_SIZE) != 0)
-            ERROR_OUT(-5950, out);
+            ERROR_OUT(-5924, out);
         if (XMEMCMP(cipher, niCipher, AES_BLOCK_SIZE) != 0)
-            ERROR_OUT(-5944, out);
+            ERROR_OUT(-5925, out);
 
         XMEMSET(plain, 0, AES_BLOCK_SIZE);
         ret = wc_AesSetKey(dec, niKey, sizeof(niKey), plain, AES_DECRYPTION);
         if (ret != 0)
-            ERROR_OUT(-5945, out);
+            ERROR_OUT(-5926, out);
         if (wc_AesEcbDecrypt(dec, plain, niCipher, AES_BLOCK_SIZE) != 0)
-            ERROR_OUT(-5951, out);
+            ERROR_OUT(-5927, out);
         wc_AesEcbDecrypt(dec, plain, niCipher, AES_BLOCK_SIZE);
         if (XMEMCMP(plain, niPlain, AES_BLOCK_SIZE) != 0)
-            ERROR_OUT(-5946, out);
+            ERROR_OUT(-5928, out);
     }
 
     wc_AesFree(enc);
@@ -8585,6 +9086,609 @@ static int aesecb_test(void)
     return ret;
 }
 #endif /* HAVE_AES_ECB */
+
+#ifdef WOLFSSL_AES_COUNTER
+static int aesctr_test(Aes* enc, Aes* dec, byte* cipher, byte* plain)
+{
+    int ret;
+
+    /* test vectors from "Recommendation for Block Cipher Modes of
+     * Operation" NIST Special Publication 800-38A */
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIv[] =
+    {
+        0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,
+        0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrPlain[] =
+    {
+        0x6b,0xc1,0xbe,0xe2,0x2e,0x40,0x9f,0x96,
+        0xe9,0x3d,0x7e,0x11,0x73,0x93,0x17,0x2a,
+        0xae,0x2d,0x8a,0x57,0x1e,0x03,0xac,0x9c,
+        0x9e,0xb7,0x6f,0xac,0x45,0xaf,0x8e,0x51,
+        0x30,0xc8,0x1c,0x46,0xa3,0x5c,0xe4,0x11,
+        0xe5,0xfb,0xc1,0x19,0x1a,0x0a,0x52,0xef,
+        0xf6,0x9f,0x24,0x45,0xdf,0x4f,0x9b,0x17,
+        0xad,0x2b,0x41,0x7b,0xe6,0x6c,0x37,0x10
+    };
+
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap32[] =
+    {
+        0xff,0xff,0xff,0xff,0x0f,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap32_2[] =
+    {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0x0f,0xff,0xff,0xfe
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap64[] =
+    {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0x0f,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap64_2[] =
+    {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xf0,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xfe
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap96[] =
+    {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0x0f,0xff,0xff,0xff
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap96_2[] =
+    {
+        0xff,0xff,0xff,0xf0,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xfe
+    };
+#endif
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap128[] =
+    {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    };
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctrIvWrap128_2[] =
+    {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xfe
+    };
+#endif
+
+#ifdef WOLFSSL_AES_128
+    WOLFSSL_SMALL_STACK_STATIC const byte oddCipher[] =
+    {
+        0xb9,0xd7,0xcb,0x08,0xb0,0xe1,0x7b,0xa0,
+        0xc2
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Key[] =
+    {
+        0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,
+        0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Cipher[] =
+    {
+        0x87,0x4d,0x61,0x91,0xb6,0x20,0xe3,0x26,
+        0x1b,0xef,0x68,0x64,0x99,0x0d,0xb6,0xce,
+        0x98,0x06,0xf6,0x6b,0x79,0x70,0xfd,0xff,
+        0x86,0x17,0x18,0x7b,0xb9,0xff,0xfd,0xff,
+        0x5a,0xe4,0xdf,0x3e,0xdb,0xd5,0xd3,0x5e,
+        0x5b,0x4f,0x09,0x02,0x0d,0xb0,0x3e,0xab,
+        0x1e,0x03,0x1d,0xda,0x2f,0xbe,0x03,0xd1,
+        0x79,0x21,0x70,0xa0,0xf3,0x00,0x9c,0xee
+    };
+
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap32Cipher[] =
+    {
+        0xb3,0x8b,0x58,0xbc,0xce,0xf4,0x71,0x78,
+        0xf6,0x7c,0xdb,0xb4,0x27,0x2b,0x0a,0xbf,
+        0x7e,0xad,0xea,0x5c,0xd1
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap32CipherLong[] =
+    {
+        0xb3,0x8b,0x58,0xbc,0xce,0xf4,0x71,0x78,
+        0xf6,0x7c,0xdb,0xb4,0x27,0x2b,0x0a,0xbf,
+        0x7e,0xad,0xea,0x5c,0xd1,0xb7,0x98,0xf0,
+        0x22,0x20,0xfe,0x67,0xb0,0x02,0x23,0x50
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap32_2CipherLong[] =
+    {
+        0x6e,0xa1,0x27,0x4d,0xea,0x20,0x5f,0x39,
+        0x68,0xc8,0xb6,0x78,0xde,0xfc,0x53,0x5c,
+        0x90,0xc8,0xf6,0xc6,0xfa,0xe0,0x7b,0x09,
+        0x7c,0xf8,0x9c,0x6a,0x5a,0xa5,0x17,0x7f,
+        0x03,0x92,0x5f,0x4e,0x85,0xea,0x26,0xc9,
+        0x5a,0xc2,0x74,0xe2,0xbf,0xe4,0x1b,0xd4
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap64Cipher[] =
+    {
+        0xdd,0x17,0x10,0x7c,0x45,0x04,0xac,0x43,
+        0xef,0xa8,0xcc,0x32,0x34,0x87,0x88,0xd7,
+        0xae,0x74,0x94,0x72,0x8e
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap64CipherLong[] =
+    {
+        0xdd,0x17,0x10,0x7c,0x45,0x04,0xac,0x43,
+        0xef,0xa8,0xcc,0x32,0x34,0x87,0x88,0xd7,
+        0xae,0x74,0x94,0x72,0x8e,0xd0,0x71,0xc0,
+        0x89,0x8a,0xa1,0xb0,0x29,0xa0,0x10,0x9e
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap64_2CipherLong[] =
+    {
+        0x3f,0xe7,0xd5,0xf3,0xfa,0x09,0xfe,0x40,
+        0xa6,0xa1,0x32,0x8b,0x57,0x12,0xb9,0xfa,
+        0xf2,0x2d,0xe4,0x3c,0x66,0x1d,0x0a,0x8e,
+        0x46,0xf8,0x2e,0x33,0xce,0x8d,0x4e,0x3b,
+        0x17,0x67,0x9e,0x9f,0x76,0x9e,0xc2,0x99,
+        0xd5,0xd4,0x71,0xed,0xb4,0x33,0xb2,0xcd
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap96Cipher[] =
+    {
+        0x55,0x24,0xc2,0x73,0xca,0xa3,0x48,0x03,
+        0x0b,0x72,0x8d,0xd7,0x6c,0x99,0x8e,0x04,
+        0x9d,0x77,0xc9,0x5f,0x38
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap96CipherLong[] =
+    {
+        0x55,0x24,0xc2,0x73,0xca,0xa3,0x48,0x03,
+        0x0b,0x72,0x8d,0xd7,0x6c,0x99,0x8e,0x04,
+        0x9d,0x77,0xc9,0x5f,0x38,0xb5,0x6e,0x44,
+        0x21,0x8e,0xda,0x57,0xe0,0x41,0xc7,0x6a
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap96_2CipherLong[] =
+    {
+        0xc8,0x81,0x1a,0xbe,0xc7,0x5b,0x93,0x6f,
+        0xe6,0x52,0xe4,0xb1,0x2d,0x1c,0x39,0xbc,
+        0xeb,0x82,0x27,0x0a,0x7e,0xa5,0x0e,0x2d,
+        0x32,0xda,0xbe,0x10,0x7a,0x10,0xcc,0xd3,
+        0x6f,0xc6,0x83,0x28,0x05,0x57,0x8a,0x24,
+        0x44,0x76,0x17,0x81,0xb9,0x5c,0x94,0x81
+    };
+#endif
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap128Cipher[] =
+    {
+        0xe1,0x33,0x38,0xe3,0x6c,0xb7,0x19,0x62,
+        0xe0,0x0d,0x02,0x0b,0x4c,0xed,0xbd,0x86,
+        0xd3,0xda,0xe1,0x5b,0x04
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap128CipherLong[] =
+    {
+        0xe1,0x33,0x38,0xe3,0x6c,0xb7,0x19,0x62,
+        0xe0,0x0d,0x02,0x0b,0x4c,0xed,0xbd,0x86,
+        0xd3,0xda,0xe1,0x5b,0x04,0xbb,0x35,0x2f,
+        0xa0,0xf5,0x9f,0xeb,0xfc,0xb4,0xda,0x3e
+    };
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr128Wrap128_2CipherLong[] =
+    {
+        0xba,0x76,0xaa,0x54,0xd5,0xb5,0x60,0x67,
+        0xc1,0xa7,0x90,0x3b,0x3f,0xdd,0xfa,0x89,
+        0x24,0xdf,0x0c,0x56,0x5c,0xf4,0x2a,0x68,
+        0x97,0x87,0x13,0xb6,0x7a,0xd1,0x24,0xfd,
+        0x4d,0x3f,0x77,0x4a,0xb9,0xe4,0x7d,0xa2,
+        0xdb,0xb9,0x31,0x5e,0xa3,0x11,0x06,0x80
+    };
+#endif
+#endif /* WOLFSSL_AES_128 */
+
+#ifdef WOLFSSL_AES_192
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Key[] =
+    {
+        0x8e,0x73,0xb0,0xf7,0xda,0x0e,0x64,0x52,
+        0xc8,0x10,0xf3,0x2b,0x80,0x90,0x79,0xe5,
+        0x62,0xf8,0xea,0xd2,0x52,0x2c,0x6b,0x7b
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Cipher[] =
+    {
+        0x1a,0xbc,0x93,0x24,0x17,0x52,0x1c,0xa2,
+        0x4f,0x2b,0x04,0x59,0xfe,0x7e,0x6e,0x0b,
+        0x09,0x03,0x39,0xec,0x0a,0xa6,0xfa,0xef,
+        0xd5,0xcc,0xc2,0xc6,0xf4,0xce,0x8e,0x94,
+        0x1e,0x36,0xb2,0x6b,0xd1,0xeb,0xc6,0x70,
+        0xd1,0xbd,0x1d,0x66,0x56,0x20,0xab,0xf7,
+        0x4f,0x78,0xa7,0xf6,0xd2,0x98,0x09,0x58,
+        0x5a,0x97,0xda,0xec,0x58,0xc6,0xb0,0x50
+    };
+
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap32Cipher[] =
+    {
+        0x28,0xaa,0xfa,0x90,0x72,0x74,0x86,0xaf,
+        0x72,0x73,0x35,0x17,0x70,0x4e,0x7d,0xca,
+        0x0c,0x33,0x97,0x06,0xc0
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap32CipherLong[] =
+    {
+        0x28,0xaa,0xfa,0x90,0x72,0x74,0x86,0xaf,
+        0x72,0x73,0x35,0x17,0x70,0x4e,0x7d,0xca,
+        0x0c,0x33,0x97,0x06,0xc0,0xbe,0x83,0x87,
+        0xdd,0xd3,0xff,0xd8,0xe4,0x6a,0x5b,0x84
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap32_2CipherLong[] =
+    {
+        0xf5,0x00,0xa2,0x91,0x54,0xa3,0x76,0xa2,
+        0xdd,0xad,0x16,0x89,0xe5,0xf0,0x1d,0x40,
+        0x84,0xcd,0x74,0x84,0xcb,0x8b,0x9e,0x29,
+        0xa9,0x8a,0x12,0x65,0xa0,0x79,0x5e,0xce,
+        0xd9,0x50,0x65,0x21,0x86,0xb0,0x85,0x0d,
+        0x98,0x2d,0x9a,0x5a,0x11,0xbe,0xa5,0x7f
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap64Cipher[] =
+    {
+        0xfe,0x39,0x27,0x97,0xac,0xe5,0xb8,0x74,
+        0xb9,0x8c,0xbf,0x58,0x71,0xa4,0x80,0x33,
+        0x3d,0xf7,0xb4,0xfd,0x8c
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap64CipherLong[] =
+    {
+        0xfe,0x39,0x27,0x97,0xac,0xe5,0xb8,0x74,
+        0xb9,0x8c,0xbf,0x58,0x71,0xa4,0x80,0x33,
+        0x3d,0xf7,0xb4,0xfd,0x8c,0x55,0x47,0x10,
+        0xd5,0x91,0x35,0xbe,0xd8,0x0d,0xa5,0x9e
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap64_2CipherLong[] =
+    {
+        0x59,0xf1,0xed,0x70,0x62,0x42,0xa8,0x06,
+        0x07,0x36,0xe1,0xc5,0x04,0x79,0xc3,0x9b,
+        0xd1,0x14,0x5c,0xcc,0x6f,0x81,0x5f,0x2f,
+        0xa0,0xde,0xcf,0x61,0x55,0x18,0x7a,0xac,
+        0xb0,0x59,0x37,0x90,0x53,0xb3,0x00,0x88,
+        0xb4,0x49,0x90,0x7b,0x96,0xcd,0xcc,0xc3
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap96Cipher[] =
+    {
+        0x41,0x21,0x40,0x31,0xfb,0xc8,0xad,0x23,
+        0xde,0x00,0x03,0xd8,0x96,0x45,0xc7,0xb5,
+        0x47,0xb5,0xf3,0x30,0x3b
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap96CipherLong[] =
+    {
+        0x41,0x21,0x40,0x31,0xfb,0xc8,0xad,0x23,
+        0xde,0x00,0x03,0xd8,0x96,0x45,0xc7,0xb5,
+        0x47,0xb5,0xf3,0x30,0x3b,0xef,0xcd,0x80,
+        0xe3,0x61,0x34,0xef,0x4e,0x1b,0x79,0xc1
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap96_2CipherLong[] =
+    {
+        0x3c,0xb2,0xff,0xc0,0x24,0xe1,0xf5,0xc4,
+        0x0f,0xd1,0x0a,0x1b,0xbe,0x1f,0x23,0xa1,
+        0x8e,0xbf,0x2b,0x96,0xb6,0x37,0xc8,0x25,
+        0x06,0x90,0xe2,0xca,0x71,0x24,0x52,0x95,
+        0xaa,0x8c,0x80,0xdf,0xb7,0xd7,0x30,0xb0,
+        0xcc,0x06,0x4f,0x28,0xa2,0x74,0x27,0xf8
+    };
+#endif
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap128Cipher[] =
+    {
+        0x5c,0xc3,0x8f,0xab,0x30,0xb6,0xac,0x67,
+        0xdc,0xc2,0x1e,0x7b,0x01,0x2e,0xcf,0x98,
+        0x8c,0x68,0xa7,0xd9,0x57
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap128CipherLong[] =
+    {
+        0x5c,0xc3,0x8f,0xab,0x30,0xb6,0xac,0x67,
+        0xdc,0xc2,0x1e,0x7b,0x01,0x2e,0xcf,0x98,
+        0x8c,0x68,0xa7,0xd9,0x57,0xab,0x09,0x0f,
+        0x01,0xc4,0x4e,0x62,0xaf,0xc2,0xdf,0x1a
+    };
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr192Wrap128_2CipherLong[] =
+    {
+        0x88,0x0a,0x26,0x4e,0xa8,0x26,0x21,0xe0,
+        0xfc,0xbc,0x63,0xdc,0xd9,0x60,0x52,0xb2,
+        0x99,0x2f,0xbb,0x1e,0x00,0xf5,0x9f,0x6d,
+        0xab,0x48,0x0f,0xc6,0x37,0x12,0x56,0xe3,
+        0x12,0x8d,0x31,0xc8,0xea,0xf4,0x41,0x82,
+        0x7a,0x88,0xe0,0xd7,0xf0,0x67,0x03,0xa4
+    };
+#endif
+#endif
+#ifdef WOLFSSL_AES_256
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Key[] =
+    {
+        0x60,0x3d,0xeb,0x10,0x15,0xca,0x71,0xbe,
+        0x2b,0x73,0xae,0xf0,0x85,0x7d,0x77,0x81,
+        0x1f,0x35,0x2c,0x07,0x3b,0x61,0x08,0xd7,
+        0x2d,0x98,0x10,0xa3,0x09,0x14,0xdf,0xf4
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Cipher[] =
+    {
+        0x60,0x1e,0xc3,0x13,0x77,0x57,0x89,0xa5,
+        0xb7,0xa7,0xf5,0x04,0xbb,0xf3,0xd2,0x28,
+        0xf4,0x43,0xe3,0xca,0x4d,0x62,0xb5,0x9a,
+        0xca,0x84,0xe9,0x90,0xca,0xca,0xf5,0xc5,
+        0x2b,0x09,0x30,0xda,0xa2,0x3d,0xe9,0x4c,
+        0xe8,0x70,0x17,0xba,0x2d,0x84,0x98,0x8d,
+        0xdf,0xc9,0xc5,0x8d,0xb6,0x7a,0xad,0xa6,
+        0x13,0xc2,0xdd,0x08,0x45,0x79,0x41,0xa6
+    };
+
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap32Cipher[] =
+    {
+        0xb0,0xa8,0xc0,0x65,0x85,0x20,0x0d,0x5c,
+        0x25,0xcf,0xe7,0x58,0x63,0xc8,0xd4,0xea,
+        0xa2,0x13,0x47,0x74,0xda
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap32CipherLong[] =
+    {
+        0xb0,0xa8,0xc0,0x65,0x85,0x20,0x0d,0x5c,
+        0x25,0xcf,0xe7,0x58,0x63,0xc8,0xd4,0xea,
+        0xa2,0x13,0x47,0x74,0xda,0x89,0x77,0x40,
+        0x28,0x9c,0xe8,0x19,0x26,0x32,0xd8,0x1f
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap32_2CipherLong[] =
+    {
+        0xf6,0xd9,0x22,0xc6,0x80,0x29,0xaf,0x14,
+        0x54,0x6c,0x0a,0xce,0x42,0xea,0x3c,0xa1,
+        0x7c,0xeb,0x36,0x0d,0x8e,0xd7,0x8c,0x59,
+        0xa8,0x09,0x9f,0x9e,0xba,0x5b,0x95,0xfa,
+        0x26,0x8c,0x37,0x59,0xf8,0xae,0x8e,0xaa,
+        0x4d,0xe4,0x1c,0xfe,0x51,0xc7,0xb7,0xcc
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap64Cipher[] =
+    {
+        0x74,0x1a,0x52,0x41,0x76,0xb4,0x11,0x8f,
+        0xfd,0x57,0x31,0xfd,0x3d,0x76,0x8f,0x07,
+        0xd4,0x94,0x4c,0xcd,0x4d
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap64CipherLong[] =
+    {
+        0x74,0x1a,0x52,0x41,0x76,0xb4,0x11,0x8f,
+        0xfd,0x57,0x31,0xfd,0x3d,0x76,0x8f,0x07,
+        0xd4,0x94,0x4c,0xcd,0x4d,0x47,0x5a,0x92,
+        0x26,0x49,0x81,0x7a,0xda,0x36,0x27,0x01
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap64_2CipherLong[] =
+    {
+        0xf7,0x9c,0xbf,0xf6,0xa2,0xaa,0x8a,0x0a,
+        0x63,0x8a,0x20,0x2f,0x12,0xf1,0x8e,0x49,
+        0x30,0xc0,0x8d,0x5c,0x5f,0x8b,0xbc,0x16,
+        0xdd,0x71,0xee,0x13,0x14,0x7b,0xe1,0x25,
+        0xcb,0x87,0x8a,0xc6,0xdc,0x1d,0x54,0x7a,
+        0xe1,0xe4,0x6f,0x0d,0x95,0x1b,0xd1,0x8b
+    };
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap96Cipher[] =
+    {
+        0xb9,0x07,0x02,0xb8,0xbe,0x94,0xbf,0x53,
+        0xdf,0x83,0x8e,0x23,0x8c,0x67,0x0c,0x81,
+        0xb8,0x69,0xa1,0x48,0x45
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap96CipherLong[] =
+    {
+        0xb9,0x07,0x02,0xb8,0xbe,0x94,0xbf,0x53,
+        0xdf,0x83,0x8e,0x23,0x8c,0x67,0x0c,0x81,
+        0xb8,0x69,0xa1,0x48,0x45,0xf1,0xc6,0x27,
+        0x36,0xa8,0xb2,0x4b,0x0e,0x62,0x6b,0x72
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap96_2CipherLong[] =
+    {
+        0xd5,0x56,0x73,0xaa,0xb8,0xe4,0x06,0xf6,
+        0x83,0x45,0x3a,0xb4,0xb9,0x63,0xec,0xad,
+        0x73,0xc5,0xab,0x78,0xb1,0x21,0xab,0xef,
+        0x69,0x15,0xb7,0x0c,0xe9,0xb4,0x3a,0xe7,
+        0xbc,0xc4,0x22,0xbd,0x93,0xba,0x52,0xe0,
+        0x91,0x2f,0x5e,0x8d,0x6d,0x59,0xf7,0xc2
+    };
+#endif
+
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap128Cipher[] =
+    {
+        0x50,0xfd,0x97,0xc3,0xe6,0x1a,0xbb,0x48,
+        0x73,0xfb,0x78,0xdf,0x1e,0x8e,0x77,0xe6,
+        0x4b,0x45,0x7c,0xd6,0x8a
+    };
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap128CipherLong[] =
+    {
+        0x50,0xfd,0x97,0xc3,0xe6,0x1a,0xbb,0x48,
+        0x73,0xfb,0x78,0xdf,0x1e,0x8e,0x77,0xe6,
+        0x4b,0x45,0x7c,0xd6,0x8a,0xcc,0xda,0x4a,
+        0x89,0xfa,0x23,0x6c,0x06,0xbf,0x26,0x05
+    };
+#ifdef WOLFSSL_ARMASM
+    WOLFSSL_SMALL_STACK_STATIC const byte ctr256Wrap128_2CipherLong[] =
+    {
+        0x24,0x5c,0x09,0xa0,0x3b,0x1a,0x5a,0x94,
+        0x2b,0x93,0x56,0x13,0x48,0xa0,0x21,0xce,
+        0x95,0x11,0xa3,0x76,0xd6,0x59,0x88,0x42,
+        0x04,0x71,0x69,0x62,0x28,0xb2,0xee,0x9d,
+        0xd5,0xa0,0xea,0xc7,0x37,0x93,0x92,0xc7,
+        0xf2,0xb6,0x8d,0xd9,0x59,0x1a,0xfa,0xbb
+    };
+#endif
+#endif
+    int i;
+    struct {
+        const byte* key;
+        int         keySz;
+        const byte* iv;
+        const byte* plain;
+        int         len;
+        const byte* cipher;
+    } testVec[] = {
+#ifdef WOLFSSL_AES_128
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIv,
+          ctrPlain, (int)sizeof(ctrPlain), ctr128Cipher },
+        /* let's try with just 9 bytes, non block size test */
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIv,
+          ctrPlain, (int)sizeof(oddCipher), ctr128Cipher },
+        /* and an additional 9 bytes to reuse tmp left buffer */
+        { NULL, 0, NULL, ctrPlain, (int)sizeof(oddCipher), oddCipher },
+        /* Counter wrapping */
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap128,
+          ctrPlain, (int)sizeof(ctr128Wrap128Cipher), ctr128Wrap128Cipher },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap128,
+          ctrPlain, (int)sizeof(ctr128Wrap128CipherLong),
+          ctr128Wrap128CipherLong },
+    #ifdef WOLFSSL_ARMASM
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap128_2,
+          ctrPlain, (int)sizeof(ctr128Wrap128_2CipherLong),
+          ctr128Wrap128_2CipherLong },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap96,
+          ctrPlain, (int)sizeof(ctr128Wrap96Cipher), ctr128Wrap96Cipher },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap96,
+          ctrPlain, (int)sizeof(ctr128Wrap96CipherLong),
+          ctr128Wrap96CipherLong },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap96_2,
+          ctrPlain, (int)sizeof(ctr128Wrap96_2CipherLong),
+          ctr128Wrap96_2CipherLong },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap64,
+          ctrPlain, (int)sizeof(ctr128Wrap64Cipher), ctr128Wrap64Cipher },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap64,
+          ctrPlain, (int)sizeof(ctr128Wrap64CipherLong),
+          ctr128Wrap64CipherLong },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap64_2,
+          ctrPlain, (int)sizeof(ctr128Wrap64_2CipherLong),
+          ctr128Wrap64_2CipherLong },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap32,
+          ctrPlain, (int)sizeof(ctr128Wrap32Cipher), ctr128Wrap32Cipher },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap32,
+          ctrPlain, (int)sizeof(ctr128Wrap32CipherLong),
+          ctr128Wrap32CipherLong },
+        { ctr128Key, (int)sizeof(ctr128Key), ctrIvWrap32_2,
+          ctrPlain, (int)sizeof(ctr128Wrap32_2CipherLong),
+          ctr128Wrap32_2CipherLong },
+    #endif
+#endif
+#ifdef WOLFSSL_AES_192
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIv,
+          ctrPlain, (int)sizeof(ctrPlain), ctr192Cipher },
+        /* let's try with just 9 bytes, non block size test */
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIv,
+          ctrPlain, (int)sizeof(oddCipher), ctr192Cipher },
+        /* Counter wrapping */
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap128,
+          ctrPlain, (int)sizeof(ctr192Wrap128Cipher), ctr192Wrap128Cipher },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap128,
+          ctrPlain, (int)sizeof(ctr192Wrap128CipherLong),
+          ctr192Wrap128CipherLong },
+    #ifdef WOLFSSL_ARMASM
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap128_2,
+          ctrPlain, (int)sizeof(ctr192Wrap128_2CipherLong),
+          ctr192Wrap128_2CipherLong },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap96,
+          ctrPlain, (int)sizeof(ctr192Wrap96Cipher), ctr192Wrap96Cipher },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap96,
+          ctrPlain, (int)sizeof(ctr192Wrap96CipherLong),
+          ctr192Wrap96CipherLong },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap96_2,
+          ctrPlain, (int)sizeof(ctr192Wrap96_2CipherLong),
+          ctr192Wrap96_2CipherLong },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap64,
+          ctrPlain, (int)sizeof(ctr192Wrap64Cipher), ctr192Wrap64Cipher },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap64,
+          ctrPlain, (int)sizeof(ctr192Wrap64CipherLong),
+          ctr192Wrap64CipherLong },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap64_2,
+          ctrPlain, (int)sizeof(ctr192Wrap64_2CipherLong),
+          ctr192Wrap64_2CipherLong },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap32,
+          ctrPlain, (int)sizeof(ctr192Wrap32Cipher), ctr192Wrap32Cipher },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap32,
+          ctrPlain, (int)sizeof(ctr192Wrap32CipherLong),
+          ctr192Wrap32CipherLong },
+        { ctr192Key, (int)sizeof(ctr192Key), ctrIvWrap32_2,
+          ctrPlain, (int)sizeof(ctr192Wrap32_2CipherLong),
+          ctr192Wrap32_2CipherLong },
+    #endif
+#endif
+#ifdef WOLFSSL_AES_256
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIv,
+          ctrPlain, (int)sizeof(ctrPlain), ctr256Cipher },
+        /* let's try with just 9 bytes, non block size test */
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIv,
+          ctrPlain, (int)sizeof(oddCipher), ctr256Cipher },
+        /* Counter wrapping */
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap128,
+          ctrPlain, (int)sizeof(ctr256Wrap128Cipher), ctr256Wrap128Cipher },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap128,
+          ctrPlain, (int)sizeof(ctr256Wrap128CipherLong),
+          ctr256Wrap128CipherLong },
+    #ifdef WOLFSSL_ARMASM
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap128_2,
+          ctrPlain, (int)sizeof(ctr256Wrap128_2CipherLong),
+          ctr256Wrap128_2CipherLong },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap96,
+          ctrPlain, (int)sizeof(ctr256Wrap96Cipher), ctr256Wrap96Cipher },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap96,
+          ctrPlain, (int)sizeof(ctr256Wrap96CipherLong),
+          ctr256Wrap96CipherLong },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap96_2,
+          ctrPlain, (int)sizeof(ctr256Wrap96_2CipherLong),
+          ctr256Wrap96_2CipherLong },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap64,
+          ctrPlain, (int)sizeof(ctr256Wrap64Cipher), ctr256Wrap64Cipher },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap64,
+          ctrPlain, (int)sizeof(ctr256Wrap64CipherLong),
+          ctr256Wrap64CipherLong },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap64_2,
+          ctrPlain, (int)sizeof(ctr256Wrap64_2CipherLong),
+          ctr256Wrap64_2CipherLong },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap32,
+          ctrPlain, (int)sizeof(ctr256Wrap32Cipher), ctr256Wrap32Cipher },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap32,
+          ctrPlain, (int)sizeof(ctr256Wrap32CipherLong),
+          ctr256Wrap32CipherLong },
+        { ctr256Key, (int)sizeof(ctr256Key), ctrIvWrap32_2,
+          ctrPlain, (int)sizeof(ctr256Wrap32_2CipherLong),
+          ctr256Wrap32_2CipherLong },
+    #endif
+#endif
+    };
+    #define AES_CTR_TEST_LEN (int)(sizeof(testVec) / sizeof(*testVec))
+
+    for (i = 0; i < AES_CTR_TEST_LEN; i++) {
+        if (testVec[i].key != NULL) {
+            ret = wc_AesSetKeyDirect(enc, testVec[i].key, testVec[i].keySz,
+                testVec[i].iv, AES_ENCRYPTION);
+            if (ret != 0) {
+                ERROR_OUT(-5930 - i * 10, out);
+            }
+            /* Ctr only uses encrypt, even on key setup */
+            ret = wc_AesSetKeyDirect(dec, testVec[i].key, testVec[i].keySz,
+                testVec[i].iv, AES_ENCRYPTION);
+            if (ret != 0) {
+                ERROR_OUT(-5931 - i * 10, out);
+            }
+        }
+
+        ret = wc_AesCtrEncrypt(enc, cipher, testVec[i].plain, testVec[i].len);
+        if (ret != 0) {
+            ERROR_OUT(-5932 - i * 10, out);
+        }
+        ret = wc_AesCtrEncrypt(dec, plain, cipher, testVec[i].len);
+        if (ret != 0) {
+            ERROR_OUT(-5933 - i * 10, out);
+        }
+
+        if (XMEMCMP(plain, ctrPlain, testVec[i].len)) {
+            ERROR_OUT(-5934 - i * 10, out);
+        }
+        if (XMEMCMP(cipher, testVec[i].cipher, testVec[i].len)) {
+            ERROR_OUT(-5935 - i * 10, out);
+        }
+    }
+
+out:
+    return ret;
+}
+#endif /* WOLFSSL_AES_COUNTER */
 
 
 WOLFSSL_TEST_SUBROUTINE int aes_test(void)
@@ -8627,11 +9731,11 @@ WOLFSSL_TEST_SUBROUTINE int aes_test(void)
 #ifdef WOLFSSL_SMALL_STACK
 #if defined(HAVE_AES_CBC) || defined(WOLFSSL_AES_COUNTER) || defined(WOLFSSL_AES_DIRECT)
     if (enc == NULL)
-        ERROR_OUT(-5948, out);
+        ERROR_OUT(-5990, out);
 #endif
 #if defined(HAVE_AES_DECRYPT) || defined(WOLFSSL_AES_COUNTER) || defined(WOLFSSL_AES_DIRECT)
     if (dec == NULL)
-        ERROR_OUT(-5949, out);
+        ERROR_OUT(-5991, out);
 #endif
 #endif
 
@@ -8737,7 +9841,7 @@ WOLFSSL_TEST_SUBROUTINE int aes_test(void)
             (bigPlain == NULL)) {
             if (bigCipher != NULL)
                 XFREE(bigCipher, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            ERROR_OUT(-5947, out);
+            ERROR_OUT(-5992, out);
         }
 #else
         byte bigCipher[sizeof(bigMsg)];
@@ -8887,231 +9991,10 @@ WOLFSSL_TEST_SUBROUTINE int aes_test(void)
 #endif /* HAVE_AES_CBC */
 
 #ifdef WOLFSSL_AES_COUNTER
-    {
-        /* test vectors from "Recommendation for Block Cipher Modes of
-         * Operation" NIST Special Publication 800-38A */
-
-        WOLFSSL_SMALL_STACK_STATIC const byte ctrIv[] =
-        {
-            0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,
-            0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff
-        };
-
-        WOLFSSL_SMALL_STACK_STATIC const byte ctrPlain[] =
-        {
-            0x6b,0xc1,0xbe,0xe2,0x2e,0x40,0x9f,0x96,
-            0xe9,0x3d,0x7e,0x11,0x73,0x93,0x17,0x2a,
-            0xae,0x2d,0x8a,0x57,0x1e,0x03,0xac,0x9c,
-            0x9e,0xb7,0x6f,0xac,0x45,0xaf,0x8e,0x51,
-            0x30,0xc8,0x1c,0x46,0xa3,0x5c,0xe4,0x11,
-            0xe5,0xfb,0xc1,0x19,0x1a,0x0a,0x52,0xef,
-            0xf6,0x9f,0x24,0x45,0xdf,0x4f,0x9b,0x17,
-            0xad,0x2b,0x41,0x7b,0xe6,0x6c,0x37,0x10
-        };
-
-#ifdef WOLFSSL_AES_128
-        WOLFSSL_SMALL_STACK_STATIC const byte oddCipher[] =
-        {
-            0xb9,0xd7,0xcb,0x08,0xb0,0xe1,0x7b,0xa0,
-            0xc2
-        };
-
-        WOLFSSL_SMALL_STACK_STATIC const byte ctr128Key[] =
-        {
-            0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,
-            0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c
-        };
-
-        WOLFSSL_SMALL_STACK_STATIC const byte ctr128Cipher[] =
-        {
-            0x87,0x4d,0x61,0x91,0xb6,0x20,0xe3,0x26,
-            0x1b,0xef,0x68,0x64,0x99,0x0d,0xb6,0xce,
-            0x98,0x06,0xf6,0x6b,0x79,0x70,0xfd,0xff,
-            0x86,0x17,0x18,0x7b,0xb9,0xff,0xfd,0xff,
-            0x5a,0xe4,0xdf,0x3e,0xdb,0xd5,0xd3,0x5e,
-            0x5b,0x4f,0x09,0x02,0x0d,0xb0,0x3e,0xab,
-            0x1e,0x03,0x1d,0xda,0x2f,0xbe,0x03,0xd1,
-            0x79,0x21,0x70,0xa0,0xf3,0x00,0x9c,0xee
-        };
-#endif /* WOLFSSL_AES_128 */
-
-#ifdef WOLFSSL_AES_192
-        WOLFSSL_SMALL_STACK_STATIC const byte ctr192Key[] =
-        {
-            0x8e,0x73,0xb0,0xf7,0xda,0x0e,0x64,0x52,
-            0xc8,0x10,0xf3,0x2b,0x80,0x90,0x79,0xe5,
-            0x62,0xf8,0xea,0xd2,0x52,0x2c,0x6b,0x7b
-        };
-
-        WOLFSSL_SMALL_STACK_STATIC const byte ctr192Cipher[] =
-        {
-            0x1a,0xbc,0x93,0x24,0x17,0x52,0x1c,0xa2,
-            0x4f,0x2b,0x04,0x59,0xfe,0x7e,0x6e,0x0b,
-            0x09,0x03,0x39,0xec,0x0a,0xa6,0xfa,0xef,
-            0xd5,0xcc,0xc2,0xc6,0xf4,0xce,0x8e,0x94,
-            0x1e,0x36,0xb2,0x6b,0xd1,0xeb,0xc6,0x70,
-            0xd1,0xbd,0x1d,0x66,0x56,0x20,0xab,0xf7,
-            0x4f,0x78,0xa7,0xf6,0xd2,0x98,0x09,0x58,
-            0x5a,0x97,0xda,0xec,0x58,0xc6,0xb0,0x50
-        };
+    ret = aesctr_test(enc, dec, cipher, plain);
+    if (ret != 0)
+        return ret;
 #endif
-#ifdef WOLFSSL_AES_256
-        WOLFSSL_SMALL_STACK_STATIC const byte ctr256Key[] =
-        {
-            0x60,0x3d,0xeb,0x10,0x15,0xca,0x71,0xbe,
-            0x2b,0x73,0xae,0xf0,0x85,0x7d,0x77,0x81,
-            0x1f,0x35,0x2c,0x07,0x3b,0x61,0x08,0xd7,
-            0x2d,0x98,0x10,0xa3,0x09,0x14,0xdf,0xf4
-        };
-
-        WOLFSSL_SMALL_STACK_STATIC const byte ctr256Cipher[] =
-        {
-            0x60,0x1e,0xc3,0x13,0x77,0x57,0x89,0xa5,
-            0xb7,0xa7,0xf5,0x04,0xbb,0xf3,0xd2,0x28,
-            0xf4,0x43,0xe3,0xca,0x4d,0x62,0xb5,0x9a,
-            0xca,0x84,0xe9,0x90,0xca,0xca,0xf5,0xc5,
-            0x2b,0x09,0x30,0xda,0xa2,0x3d,0xe9,0x4c,
-            0xe8,0x70,0x17,0xba,0x2d,0x84,0x98,0x8d,
-            0xdf,0xc9,0xc5,0x8d,0xb6,0x7a,0xad,0xa6,
-            0x13,0xc2,0xdd,0x08,0x45,0x79,0x41,0xa6
-        };
-#endif
-
-#ifdef WOLFSSL_AES_128
-        ret = wc_AesSetKeyDirect(enc, ctr128Key, sizeof(ctr128Key),
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5947, out);
-        }
-        /* Ctr only uses encrypt, even on key setup */
-        ret = wc_AesSetKeyDirect(dec, ctr128Key, sizeof(ctr128Key),
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5948, out);
-        }
-
-        ret = wc_AesCtrEncrypt(enc, cipher, ctrPlain, sizeof(ctrPlain));
-        if (ret != 0) {
-            ERROR_OUT(-5923, out);
-        }
-        ret = wc_AesCtrEncrypt(dec, plain, cipher, sizeof(ctrPlain));
-        if (ret != 0) {
-            ERROR_OUT(-5924, out);
-        }
-        if (XMEMCMP(plain, ctrPlain, sizeof(ctrPlain)))
-            ERROR_OUT(-5925, out);
-
-        if (XMEMCMP(cipher, ctr128Cipher, sizeof(ctr128Cipher)))
-            ERROR_OUT(-5926, out);
-
-        /* let's try with just 9 bytes, non block size test */
-        ret = wc_AesSetKeyDirect(enc, ctr128Key, AES_BLOCK_SIZE,
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5949, out);
-        }
-        /* Ctr only uses encrypt, even on key setup */
-        ret = wc_AesSetKeyDirect(dec, ctr128Key, AES_BLOCK_SIZE,
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5952, out);
-        }
-
-        ret = wc_AesCtrEncrypt(enc, cipher, ctrPlain, sizeof(oddCipher));
-        if (ret != 0) {
-            ERROR_OUT(-5927, out);
-        }
-        ret = wc_AesCtrEncrypt(dec, plain, cipher, sizeof(oddCipher));
-        if (ret != 0) {
-            ERROR_OUT(-5928, out);
-        }
-
-        if (XMEMCMP(plain, ctrPlain, sizeof(oddCipher)))
-            ERROR_OUT(-5929, out);
-
-        if (XMEMCMP(cipher, ctr128Cipher, sizeof(oddCipher)))
-            ERROR_OUT(-5930, out);
-
-        /* and an additional 9 bytes to reuse tmp left buffer */
-        ret = wc_AesCtrEncrypt(enc, cipher, ctrPlain, sizeof(oddCipher));
-        if (ret != 0) {
-            ERROR_OUT(-5931, out);
-        }
-        ret = wc_AesCtrEncrypt(dec, plain, cipher, sizeof(oddCipher));
-        if (ret != 0) {
-            ERROR_OUT(-5932, out);
-        }
-
-        if (XMEMCMP(plain, ctrPlain, sizeof(oddCipher)))
-            ERROR_OUT(-5933, out);
-
-        if (XMEMCMP(cipher, oddCipher, sizeof(oddCipher)))
-            ERROR_OUT(-5934, out);
-#endif /* WOLFSSL_AES_128 */
-
-#ifdef WOLFSSL_AES_192
-        /* 192 bit key */
-        ret = wc_AesSetKeyDirect(enc, ctr192Key, sizeof(ctr192Key),
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5953, out);
-        }
-        /* Ctr only uses encrypt, even on key setup */
-        ret = wc_AesSetKeyDirect(dec, ctr192Key, sizeof(ctr192Key),
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5954, out);
-        }
-
-        XMEMSET(plain, 0, sizeof(plain));
-        ret = wc_AesCtrEncrypt(enc, plain, ctr192Cipher, sizeof(ctr192Cipher));
-        if (ret != 0) {
-            ERROR_OUT(-5935, out);
-        }
-
-        if (XMEMCMP(plain, ctrPlain, sizeof(ctr192Cipher)))
-            ERROR_OUT(-5936, out);
-
-        ret = wc_AesCtrEncrypt(dec, cipher, ctrPlain, sizeof(ctrPlain));
-        if (ret != 0) {
-            ERROR_OUT(-5937, out);
-        }
-        if (XMEMCMP(ctr192Cipher, cipher, sizeof(ctr192Cipher)))
-            ERROR_OUT(-5938, out);
-#endif /* WOLFSSL_AES_192 */
-
-#ifdef WOLFSSL_AES_256
-        /* 256 bit key */
-        ret = wc_AesSetKeyDirect(enc, ctr256Key, sizeof(ctr256Key),
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5955, out);
-        }
-        /* Ctr only uses encrypt, even on key setup */
-        ret = wc_AesSetKeyDirect(dec, ctr256Key, sizeof(ctr256Key),
-                           ctrIv, AES_ENCRYPTION);
-        if (ret != 0) {
-            ERROR_OUT(-5956, out);
-        }
-
-        XMEMSET(plain, 0, sizeof(plain));
-        ret = wc_AesCtrEncrypt(enc, plain, ctr256Cipher, sizeof(ctr256Cipher));
-        if (ret != 0) {
-            ERROR_OUT(-5939, out);
-        }
-
-        if (XMEMCMP(plain, ctrPlain, sizeof(ctrPlain)))
-            ERROR_OUT(-5940, out);
-
-        ret = wc_AesCtrEncrypt(dec, cipher, ctrPlain, sizeof(ctrPlain));
-        if (ret != 0) {
-            ERROR_OUT(-5941, out);
-        }
-        if (XMEMCMP(ctr256Cipher, cipher, sizeof(ctr256Cipher)))
-            ERROR_OUT(-5942, out);
-#endif /* WOLFSSL_AES_256 */
-    }
-#endif /* WOLFSSL_AES_COUNTER */
 
 #if defined(WOLFSSL_AES_DIRECT) && defined(WOLFSSL_AES_256)
     {
@@ -9138,34 +10021,34 @@ WOLFSSL_TEST_SUBROUTINE int aes_test(void)
         XMEMSET(cipher, 0, AES_BLOCK_SIZE);
         ret = wc_AesSetKey(enc, niKey, sizeof(niKey), cipher, AES_ENCRYPTION);
         if (ret != 0)
-            ERROR_OUT(-5943, out);
+            ERROR_OUT(-5994, out);
 #if !defined(HAVE_SELFTEST) && \
     (defined(WOLFSSL_LINUXKM) || \
      !defined(HAVE_FIPS) || \
      (defined(FIPS_VERSION_GE) && FIPS_VERSION_GE(5,3)))
         if (wc_AesEncryptDirect(enc, cipher, niPlain) != 0)
-            ERROR_OUT(-5950, out);
+            ERROR_OUT(-5995, out);
 #else
         wc_AesEncryptDirect(enc, cipher, niPlain);
 #endif
         if (XMEMCMP(cipher, niCipher, AES_BLOCK_SIZE) != 0)
-            ERROR_OUT(-5944, out);
+            ERROR_OUT(-5996, out);
 
         XMEMSET(plain, 0, AES_BLOCK_SIZE);
         ret = wc_AesSetKey(dec, niKey, sizeof(niKey), plain, AES_DECRYPTION);
         if (ret != 0)
-            ERROR_OUT(-5945, out);
+            ERROR_OUT(-5997, out);
 #if !defined(HAVE_SELFTEST) && \
     (defined(WOLFSSL_LINUXKM) || \
      !defined(HAVE_FIPS) || \
      (defined(FIPS_VERSION_GE) && FIPS_VERSION_GE(5,3)))
         if (wc_AesDecryptDirect(dec, plain, niCipher) != 0)
-            ERROR_OUT(-5951, out);
+            ERROR_OUT(-5998, out);
 #else
         wc_AesDecryptDirect(dec, plain, niCipher);
 #endif
         if (XMEMCMP(plain, niPlain, AES_BLOCK_SIZE) != 0)
-            ERROR_OUT(-5946, out);
+            ERROR_OUT(-5999, out);
     }
 #endif /* WOLFSSL_AES_DIRECT && WOLFSSL_AES_256 */
 
@@ -24384,24 +25267,31 @@ exit:
 /* ECC Non-blocking tests for Sign and Verify */
 /* Requires SP math and supports P384 or P256 */
 /* ./configure --enable-ecc=nonblock --enable-sp=yes,nonblock CFLAGS="-DWOLFSSL_PUBLIC_MP" */
-#if defined(WC_ECC_NONBLOCK) && defined(WOLFSSL_PUBLIC_MP) && \
-    defined(HAVE_ECC_SIGN) && defined(HAVE_ECC_VERIFY) && \
-    defined(WOLFSSL_HAVE_SP_ECC)
-/* Test Data - Random */
-static const uint8_t kMsg[] = {
-    0x69, 0xbc, 0x9f, 0xce, 0x68, 0x17, 0xc2, 0x10, 0xea, 0xfc, 0x10, 0x65, 0x67, 0x52, 0xed, 0x78,
-    0x6e, 0xb8, 0x83, 0x9c, 0x9a, 0xb4, 0x56, 0x0d, 0xc1, 0x0d, 0x1f, 0x78, 0x6e, 0x75, 0xd7, 0xbe,
-    0x92, 0x6b, 0x12, 0xf6, 0x76, 0x60, 0x8e, 0xb1, 0xf4, 0x19, 0x0c, 0x81, 0xe7, 0x54, 0x5e, 0xbc,
-    0xe0, 0xae, 0xc2, 0x7d, 0x1b, 0xc4, 0x6e, 0xec, 0xb1, 0x99, 0x6c, 0xbf, 0x0e, 0x38, 0xa8, 0x01,
-    0xa6, 0x9a, 0x48, 0x12, 0xe4, 0xc9, 0x3b, 0xf0, 0x63, 0x46, 0x15, 0xb4, 0x61, 0xa8, 0x1a, 0x60,
-    0x71, 0x87, 0x98, 0xd7, 0x6f, 0x98, 0x7b, 0x2d, 0xb9, 0x19, 0x1b, 0x21, 0x9c, 0x70, 0x58, 0xe8,
-    0x0d, 0x0f, 0xe9, 0x2d, 0x9a, 0x9a, 0xf1, 0x55, 0xa0, 0x4c, 0xd3, 0x07, 0xbd, 0x97, 0x48, 0xec,
-    0x88, 0x0a, 0xaf, 0xb3, 0x80, 0x78, 0xa4, 0x59, 0x43, 0x57, 0xd3, 0xa7, 0x01, 0x66, 0x0e, 0xfc
-};
-
+#if defined(WC_ECC_NONBLOCK) && defined(WOLFSSL_HAVE_SP_ECC) && \
+    defined(WOLFSSL_PUBLIC_MP)
 /* ECC Private Key "d" */
-static const uint8_t kPrivKey[] = {
+static const byte p256PrivKey[] = {
+    /* SECP256R1 */
+    /* d */
+    0x1e, 0xe7, 0x70, 0x07, 0xd3, 0x30, 0x94, 0x39,
+    0x28, 0x90, 0xdf, 0x23, 0x88, 0x2c, 0x4a, 0x34,
+    0x15, 0xdb, 0x4c, 0x43, 0xcd, 0xfa, 0xe5, 0x1f,
+    0x3d, 0x4c, 0x37, 0xfe, 0x59, 0x3b, 0x96, 0xd8
+};
+#ifdef HAVE_ECC384
+static const byte p384PrivKey[] = {
+    /* SECP384R1 */
+    /* d */
+    0xa4, 0xe5, 0x06, 0xe8, 0x06, 0x16, 0x3e, 0xab,
+    0x89, 0xf8, 0x60, 0x43, 0xc0, 0x60, 0x25, 0xdb,
+    0xba, 0x7b, 0xfe, 0x19, 0x35, 0x08, 0x55, 0x65,
+    0x76, 0xe2, 0xdc, 0xe0, 0x01, 0x8b, 0x6b, 0x68,
+    0xdf, 0xcf, 0x6f, 0x80, 0x12, 0xce, 0x79, 0x37,
+    0xeb, 0x2b, 0x9c, 0x7b, 0xc4, 0x68, 0x1c, 0x74
+};
+#endif /* HAVE_ECC384 */
 #ifdef HAVE_ECC521
+static const byte p521PrivKey[] = {
     /* SECP521R1 */
     /* d */
     0x01, 0x68, 0x91, 0x33, 0x53, 0xe2, 0x90, 0x68,
@@ -24413,28 +25303,44 @@ static const uint8_t kPrivKey[] = {
     0x02, 0x32, 0xee, 0x26, 0x87, 0xcc, 0xed, 0x63,
     0x3f, 0x39, 0x27, 0xf0, 0xd7, 0x17, 0x77, 0xa1,
     0xa4, 0x36
-#elif defined(HAVE_ECC384)
-    /* SECP384R1 */
-    /* d */
-    0xa4, 0xe5, 0x06, 0xe8, 0x06, 0x16, 0x3e, 0xab,
-    0x89, 0xf8, 0x60, 0x43, 0xc0, 0x60, 0x25, 0xdb,
-    0xba, 0x7b, 0xfe, 0x19, 0x35, 0x08, 0x55, 0x65,
-    0x76, 0xe2, 0xdc, 0xe0, 0x01, 0x8b, 0x6b, 0x68,
-    0xdf, 0xcf, 0x6f, 0x80, 0x12, 0xce, 0x79, 0x37,
-    0xeb, 0x2b, 0x9c, 0x7b, 0xc4, 0x68, 0x1c, 0x74
-#else
-    /* SECP256R1 */
-    /* d */
-    0x1e, 0xe7, 0x70, 0x07, 0xd3, 0x30, 0x94, 0x39,
-    0x28, 0x90, 0xdf, 0x23, 0x88, 0x2c, 0x4a, 0x34,
-    0x15, 0xdb, 0x4c, 0x43, 0xcd, 0xfa, 0xe5, 0x1f,
-    0x3d, 0x4c, 0x37, 0xfe, 0x59, 0x3b, 0x96, 0xd8
-#endif
 };
+#endif /* HAVE_ECC521 */
 
 /* ECC public key Qx/Qy */
-static const uint8_t kPubKey[] = {
+static const byte p256PubKey[] = {
+    /* SECP256R1 */
+    /* Qx */
+    0x96, 0x93, 0x1c, 0x53, 0x0b, 0x43, 0x6c, 0x42,
+    0x0c, 0x52, 0x90, 0xe4, 0xa7, 0xec, 0x98, 0xb1,
+    0xaf, 0xd4, 0x14, 0x49, 0xd8, 0xc1, 0x42, 0x82,
+    0x04, 0x78, 0xd1, 0x90, 0xae, 0xa0, 0x6c, 0x07,
+    /* Qy */
+    0xf2, 0x3a, 0xb5, 0x10, 0x32, 0x8d, 0xce, 0x9e,
+    0x76, 0xa0, 0xd2, 0x8c, 0xf3, 0xfc, 0xa9, 0x94,
+    0x43, 0x24, 0xe6, 0x82, 0x00, 0x40, 0xc6, 0xdb,
+    0x1c, 0x2f, 0xcd, 0x38, 0x4b, 0x60, 0xdd, 0x61
+};
+#ifdef HAVE_ECC384
+static const byte p384PubKey[] = {
+    /* SECP384R1 */
+    /* Qx */
+    0xea, 0xcf, 0x93, 0x4f, 0x2c, 0x09, 0xbb, 0x39,
+    0x14, 0x0f, 0x56, 0x64, 0xc3, 0x40, 0xb4, 0xdf,
+    0x0e, 0x63, 0xae, 0xe5, 0x71, 0x4b, 0x00, 0xcc,
+    0x04, 0x97, 0xff, 0xe1, 0xe9, 0x38, 0x96, 0xbb,
+    0x5f, 0x91, 0xb2, 0x6a, 0xcc, 0xb5, 0x39, 0x5f,
+    0x8f, 0x70, 0x59, 0xf1, 0x01, 0xf6, 0x5a, 0x2b,
+    /* Qy */
+    0x01, 0x6c, 0x68, 0x0b, 0xcf, 0x55, 0x25, 0xaf,
+    0x6d, 0x98, 0x48, 0x0a, 0xa8, 0x74, 0xc9, 0xa9,
+    0x17, 0xa0, 0x0c, 0xc3, 0xfb, 0xd3, 0x23, 0x68,
+    0xfe, 0x04, 0x3c, 0x63, 0x50, 0x88, 0x3b, 0xb9,
+    0x4f, 0x7c, 0x67, 0x34, 0xf7, 0x3b, 0xa9, 0x73,
+    0xe7, 0x1b, 0xc3, 0x51, 0x5e, 0x22, 0x18, 0xec
+};
+#endif
 #ifdef HAVE_ECC521
+static const byte p521PubKey[] = {
     /* SECP521R1 */
     /* Qx */
     0x01, 0x62, 0x6e, 0xf1, 0x00, 0xec, 0xd8, 0x99,
@@ -24456,268 +25362,7 @@ static const uint8_t kPubKey[] = {
     0x37, 0x24, 0xd8, 0xbf, 0x03, 0x0d, 0x8b, 0xb5,
     0x40, 0x5c, 0x4f, 0xd6, 0x13, 0x73, 0x42, 0xbc,
     0x91, 0xd9
-#elif defined(HAVE_ECC384)
-    /* SECP384R1 */
-    /* Qx */
-    0xea, 0xcf, 0x93, 0x4f, 0x2c, 0x09, 0xbb, 0x39,
-    0x14, 0x0f, 0x56, 0x64, 0xc3, 0x40, 0xb4, 0xdf,
-    0x0e, 0x63, 0xae, 0xe5, 0x71, 0x4b, 0x00, 0xcc,
-    0x04, 0x97, 0xff, 0xe1, 0xe9, 0x38, 0x96, 0xbb,
-    0x5f, 0x91, 0xb2, 0x6a, 0xcc, 0xb5, 0x39, 0x5f,
-    0x8f, 0x70, 0x59, 0xf1, 0x01, 0xf6, 0x5a, 0x2b,
-    /* Qy */
-    0x01, 0x6c, 0x68, 0x0b, 0xcf, 0x55, 0x25, 0xaf,
-    0x6d, 0x98, 0x48, 0x0a, 0xa8, 0x74, 0xc9, 0xa9,
-    0x17, 0xa0, 0x0c, 0xc3, 0xfb, 0xd3, 0x23, 0x68,
-    0xfe, 0x04, 0x3c, 0x63, 0x50, 0x88, 0x3b, 0xb9,
-    0x4f, 0x7c, 0x67, 0x34, 0xf7, 0x3b, 0xa9, 0x73,
-    0xe7, 0x1b, 0xc3, 0x51, 0x5e, 0x22, 0x18, 0xec
-#else
-    /* SECP256R1 */
-    /* Qx */
-    0x96, 0x93, 0x1c, 0x53, 0x0b, 0x43, 0x6c, 0x42,
-    0x0c, 0x52, 0x90, 0xe4, 0xa7, 0xec, 0x98, 0xb1,
-    0xaf, 0xd4, 0x14, 0x49, 0xd8, 0xc1, 0x42, 0x82,
-    0x04, 0x78, 0xd1, 0x90, 0xae, 0xa0, 0x6c, 0x07,
-    /* Qy */
-    0xf2, 0x3a, 0xb5, 0x10, 0x32, 0x8d, 0xce, 0x9e,
-    0x76, 0xa0, 0xd2, 0x8c, 0xf3, 0xfc, 0xa9, 0x94,
-    0x43, 0x24, 0xe6, 0x82, 0x00, 0x40, 0xc6, 0xdb,
-    0x1c, 0x2f, 0xcd, 0x38, 0x4b, 0x60, 0xdd, 0x61
-#endif
 };
-
-/* ECC Curve */
-#ifdef HAVE_ECC521
-    /* SECP521R1 */
-    #define ECC_CURVE_SZ 66
-    #define ECC_CURVE_ID ECC_SECP521R1
-#elif defined(HAVE_ECC384)
-    /* SECP384R1 */
-    #define ECC_CURVE_SZ 48
-    #define ECC_CURVE_ID ECC_SECP384R1
-#else
-    /* SECP256R1 */
-    #define ECC_CURVE_SZ 32
-    #define ECC_CURVE_ID ECC_SECP256R1
-#endif
-
-/* Hash Algorithm */
-#if defined(HAVE_ECC521) && defined(WOLFSSL_SHA3)
-    #define HASH_DIGEST_SZ  WC_SHA3_512_DIGEST_SIZE
-    #define HASH_SHA_VER    3
-    #define CRYPTO_HASH_FN  crypto_sha3_512
-#elif defined(HAVE_ECC521) && defined(WOLFSSL_SHA512)
-    #define HASH_DIGEST_SZ  WC_SHA512_DIGEST_SIZE
-    #define HASH_SHA_VER    2
-    #define CRYPTO_HASH_FN  crypto_sha2_512
-#elif defined(HAVE_ECC384) && defined(WOLFSSL_SHA3)
-    #define HASH_DIGEST_SZ  WC_SHA3_384_DIGEST_SIZE
-    #define HASH_SHA_VER    3
-    #define CRYPTO_HASH_FN  crypto_sha3_384
-#elif defined(HAVE_ECC384) && defined(WOLFSSL_SHA384)
-    #define HASH_DIGEST_SZ  WC_SHA384_DIGEST_SIZE
-    #define HASH_SHA_VER    2
-    #define CRYPTO_HASH_FN  crypto_sha2_384
-#elif !defined(NO_SHA256)
-    #define HASH_DIGEST_SZ  WC_SHA256_DIGEST_SIZE
-    #define HASH_SHA_VER    2
-    #define CRYPTO_HASH_FN  crypto_sha2_256
-#else
-    #error test configuration not supported
-#endif
-
-#if defined(HAVE_ECC521) && defined(WOLFSSL_SHA3)
-/* helper to perform hashing block by block */
-static int crypto_sha3_512(const uint8_t *buf, uint32_t len, uint8_t *hash,
-    uint32_t hashSz, uint32_t blkSz)
-{
-    int ret;
-    uint32_t i = 0, chunk;
-    wc_Sha3 sha3;
-
-    /* validate arguments */
-    if ((buf == NULL && len > 0) || hash == NULL ||
-        hashSz < WC_SHA3_512_DIGEST_SIZE || blkSz == 0)
-    {
-        return BAD_FUNC_ARG;
-    }
-
-    /* Init Sha3_512 structure */
-    ret = wc_InitSha3_512(&sha3, NULL, INVALID_DEVID);
-    if (ret != 0) {
-        return ret;
-    }
-    while (i < len) {
-        chunk = blkSz;
-        if ((chunk + i) > len)
-            chunk = len - i;
-        /* Perform chunked update */
-        ret = wc_Sha3_512_Update(&sha3, (buf + i), chunk);
-        if (ret != 0) {
-            break;
-        }
-        i += chunk;
-    }
-    if (ret == 0) {
-        /* Get final digest result */
-        ret = wc_Sha3_512_Final(&sha3, hash);
-    }
-    return ret;
-}
-#elif defined(HAVE_ECC521) && defined(WOLFSSL_SHA512)
-/* helper to perform hashing block by block */
-static int crypto_sha2_512(const uint8_t *buf, uint32_t len, uint8_t *hash,
-    uint32_t hashSz, uint32_t blkSz)
-{
-    int ret;
-    uint32_t i = 0, chunk;
-    wc_Sha512 sha512;
-
-    /* validate arguments */
-    if ((buf == NULL && len > 0) || hash == NULL ||
-        hashSz < WC_SHA512_DIGEST_SIZE || blkSz == 0)
-    {
-        return BAD_FUNC_ARG;
-    }
-
-    /* Init Sha512 structure */
-    ret = wc_InitSha512(&sha512);
-    if (ret != 0) {
-        return ret;
-    }
-    while (i < len) {
-        chunk = blkSz;
-        if ((chunk + i) > len)
-            chunk = len - i;
-        /* Perform chunked update */
-        ret = wc_Sha512Update(&sha512, (buf + i), chunk);
-        if (ret != 0) {
-            break;
-        }
-        i += chunk;
-    }
-    if (ret == 0) {
-        /* Get final digest result */
-        ret = wc_Sha512Final(&sha512, hash);
-    }
-    return ret;
-}
-#elif defined(HAVE_ECC384) && defined(WOLFSSL_SHA3)
-/* helper to perform hashing block by block */
-static int crypto_sha3_384(const uint8_t *buf, uint32_t len, uint8_t *hash,
-    uint32_t hashSz, uint32_t blkSz)
-{
-    int ret;
-    uint32_t i = 0, chunk;
-    wc_Sha3 sha3;
-
-    /* validate arguments */
-    if ((buf == NULL && len > 0) || hash == NULL ||
-        hashSz < WC_SHA3_384_DIGEST_SIZE || blkSz == 0)
-    {
-        return BAD_FUNC_ARG;
-    }
-
-    /* Init Sha3_384 structure */
-    ret = wc_InitSha3_384(&sha3, NULL, INVALID_DEVID);
-    if (ret != 0) {
-        return ret;
-    }
-    while (i < len) {
-        chunk = blkSz;
-        if ((chunk + i) > len)
-            chunk = len - i;
-        /* Perform chunked update */
-        ret = wc_Sha3_384_Update(&sha3, (buf + i), chunk);
-        if (ret != 0) {
-            break;
-        }
-        i += chunk;
-    }
-    if (ret == 0) {
-        /* Get final digest result */
-        ret = wc_Sha3_384_Final(&sha3, hash);
-    }
-    return ret;
-}
-#elif defined(HAVE_ECC384) && defined(WOLFSSL_SHA384)
-/* helper to perform hashing block by block */
-static int crypto_sha2_384(const uint8_t *buf, uint32_t len, uint8_t *hash,
-    uint32_t hashSz, uint32_t blkSz)
-{
-    int ret;
-    uint32_t i = 0, chunk;
-    wc_Sha384 sha384;
-
-    /* validate arguments */
-    if ((buf == NULL && len > 0) || hash == NULL ||
-        hashSz < WC_SHA384_DIGEST_SIZE || blkSz == 0)
-    {
-        return BAD_FUNC_ARG;
-    }
-
-    /* Init Sha384 structure */
-    ret = wc_InitSha384(&sha384);
-    if (ret != 0) {
-        return ret;
-    }
-    while (i < len) {
-        chunk = blkSz;
-        if ((chunk + i) > len)
-            chunk = len - i;
-        /* Perform chunked update */
-        ret = wc_Sha384Update(&sha384, (buf + i), chunk);
-        if (ret != 0) {
-            break;
-        }
-        i += chunk;
-    }
-    if (ret == 0) {
-        /* Get final digest result */
-        ret = wc_Sha384Final(&sha384, hash);
-    }
-    return ret;
-}
-#elif !defined(NO_SHA256)
-/* helper to perform hashing block by block */
-static int crypto_sha2_256(const uint8_t *buf, uint32_t len, uint8_t *hash,
-    uint32_t hashSz, uint32_t blkSz)
-{
-    int ret;
-    uint32_t i = 0, chunk;
-    wc_Sha256 sha256;
-
-    /* validate arguments */
-    if ((buf == NULL && len > 0) || hash == NULL ||
-        hashSz < WC_SHA256_DIGEST_SIZE || blkSz == 0)
-    {
-        return BAD_FUNC_ARG;
-    }
-
-    /* Init Sha256 structure */
-    ret = wc_InitSha256(&sha256);
-    if (ret != 0) {
-        return ret;
-    }
-    while (i < len) {
-        chunk = blkSz;
-        if ((chunk + i) > len)
-            chunk = len - i;
-        /* Perform chunked update */
-        ret = wc_Sha256Update(&sha256, (buf + i), chunk);
-        if (ret != 0) {
-            break;
-        }
-        i += chunk;
-    }
-    if (ret == 0) {
-        /* Get final digest result */
-        ret = wc_Sha256Final(&sha256, hash);
-    }
-    return ret;
-}
-#endif
 
 /* perform verify of signature and hash using public key */
 /* key is public Qx + public Qy */
@@ -24901,48 +25546,177 @@ static int crypto_ecc_sign(const uint8_t *key, uint32_t keySz,
 
     return ret;
 }
+#endif /* HAVE_ECC_SIGN && HAVE_ECC_VERIFY */
 
-static int ecc_test_nonblock(WC_RNG* rng)
+/*
+ * This test doesn't work with WOLFSSL_VALIDATE_ECC_KEYGEN defined because we
+ * don't have non-blocking versions of the key checking functions, yet.
+ */
+#if defined(HAVE_ECC_DHE) && !defined(WOLFSSL_VALIDATE_ECC_KEYGEN)
+static int ecc_test_nonblock_dhe(int curveId, word32 curveSz,
+    const byte* privKey, const byte* pubKey, WC_RNG* rng)
 {
     int ret;
-    uint8_t hash[HASH_DIGEST_SZ];
-    uint8_t sig[ECC_CURVE_SZ*2];
-    uint32_t sigSz = sizeof(sig);
+    ecc_key keyA;
+    ecc_key keyB;
+    ecc_nb_ctx_t nbCtxA;
+    ecc_nb_ctx_t nbCtxB;
+    byte secretA[ECC_SHARED_SIZE];
+    byte secretB[ECC_SHARED_SIZE];
+    word32 secretSzA = ECC_SHARED_SIZE;
+    word32 secretSzB = ECC_SHARED_SIZE;
+    int count = 0;
 
-    ret = CRYPTO_HASH_FN(
-        kMsg, sizeof(kMsg), /* input message */
-        hash, sizeof(hash), /* hash digest result */
-        32                  /* configurable block / chunk size */
-    );
+    ret = wc_ecc_init(&keyA);
+    if (ret == 0) {
+        ret = wc_ecc_init(&keyB);
+    }
+    if (ret == 0) {
+        ret = wc_ecc_set_nonblock(&keyA, &nbCtxA);
+    }
+    if (ret == 0) {
+        ret = wc_ecc_set_nonblock(&keyB, &nbCtxB);
+    }
+    if (ret == 0) {
+        do {
+            ret = wc_ecc_make_key_ex(rng, curveSz, &keyA, curveId);
+            count++;
+        } while (ret == FP_WOULDBLOCK);
+    }
+#ifdef DEBUG_WOLFSSL
+    fprintf(stderr, "ECC non-block key gen: %d times\n", count);
+#endif
+    if (ret == 0) {
+        ret = wc_ecc_check_key(&keyA);
+    }
+    if (ret == 0) {
+        ret = wc_ecc_import_unsigned(&keyB, pubKey, pubKey + curveSz,
+                                     privKey, curveId);
+    }
+    count = 0;
+    if (ret == 0) {
+        do {
+            ret = wc_ecc_shared_secret(&keyA, &keyB, secretA, &secretSzA);
+            count++;
+        } while (ret == FP_WOULDBLOCK);
+    }
+#ifdef DEBUG_WOLFSSL
+    fprintf(stderr, "ECC non-block shared secret: %d times\n", count);
+#endif
+    if (ret == 0) {
+        do {
+            ret = wc_ecc_shared_secret(&keyB, &keyA, secretB, &secretSzB);
+        } while (ret == FP_WOULDBLOCK);
+    }
+    if (ret == 0) {
+        if (secretSzA != secretSzB ||
+            XMEMCMP(secretA, secretB, secretSzA) != 0) {
+            ret = -1;
+        }
+    }
+
+    wc_ecc_free(&keyA);
+    wc_ecc_free(&keyB);
+
+    return ret;
+}
+#endif /* HAVE_ECC_DHE && !WOLFSSL_VALIDATE_ECC_KEYGEN */
+
+#if defined(HAVE_ECC_SIGN) && defined(HAVE_ECC_VERIFY)
+static int ecc_test_nonblock_ecdsa(int curveId, word32 curveSz,
+    const byte* privKey, word32 privKeySz, const byte* pubKey, word32 pubKeySz,
+    WC_RNG* rng)
+{
+    int ret = 0;
+    byte* sig = NULL;
+    word32 sigSz = curveSz * 2;
+    static const byte hash[] = {
+        0x8d, 0x28, 0xa3, 0x8b, 0x0b, 0xa9, 0xfe, 0xd4, 0x0e, 0x54, 0xc4, 0x17,
+        0x3d, 0x54, 0x66, 0x34, 0xbf, 0x5d, 0x6f, 0x46, 0xc2, 0x20, 0xcb, 0xc3,
+        0x22, 0xe9, 0xb0, 0xdf, 0xe7, 0x64, 0x3f, 0xd9
+    };
+
+    sig = (byte*)XMALLOC(sigSz, HEAP_HINT, DYNAMIC_TYPE_SIGNATURE);
+    if (sig == NULL) {
+        ret = -1;
+    }
     if (ret == 0) {
         /* Sign hash using private key */
         /* Note: result of an ECC sign varies for each call even with same
             private key and hash. This is because a new random public key is
             used for each operation. */
-        ret = crypto_ecc_sign(
-            kPrivKey, sizeof(kPrivKey), /* private key */
-            hash, sizeof(hash),         /* computed hash digest */
-            sig, &sigSz,                /* signature r/s */
-            ECC_CURVE_SZ,               /* curve size in bytes */
-            ECC_CURVE_ID,               /* curve id */
-            rng
-        );
+        ret = crypto_ecc_sign(privKey, privKeySz, hash, sizeof(hash), sig,
+                  &sigSz, curveSz, curveId, rng);
     }
-
     if (ret == 0) {
         /* Verify generated signature is valid */
-        ret = crypto_ecc_verify(
-            kPubKey, sizeof(kPubKey),   /* public key point x/y */
-            hash, sizeof(hash),         /* computed hash digest */
-            sig, sigSz,                 /* signature r/s */
-            ECC_CURVE_SZ,               /* curve size in bytes */
-            ECC_CURVE_ID                /* curve id */
-        );
+        ret = crypto_ecc_verify(pubKey, pubKeySz, hash, sizeof(hash), sig,
+                  sigSz, curveSz, curveId);
+    }
+
+    if (sig != NULL) {
+        XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_SIGNATURE);
     }
 
     return ret;
 }
-#endif /* WC_ECC_NONBLOCK && WOLFSSL_PUBLIC_MP && HAVE_ECC_SIGN && HAVE_ECC_VERIFY */
+#endif /* HAVE_ECC_SIGN && HAVE_ECC_VERIFY */
+
+static int ecc_test_nonblock(WC_RNG* rng)
+{
+    int ret = 0;
+    word32 i;
+    int curveIds[3] = {0, 0, 0};
+    word32 curveSzs[3] = {0, 0, 0};
+    const byte* privKeys[3] = {NULL, NULL, NULL};
+    word32 privKeySzs[3] = {0, 0, 0};
+    const byte* pubKeys[3] = {NULL, NULL, NULL};
+    word32 pubKeySzs[3] = {0, 0, 0};
+
+    curveIds[0] = ECC_SECP256R1;
+    curveSzs[0] = 32;
+    privKeys[0] = p256PrivKey;
+    privKeySzs[0] = sizeof(p256PrivKey);
+    pubKeys[0] = p256PubKey;
+    pubKeySzs[0] = sizeof(p256PubKey);
+#ifdef HAVE_ECC384
+    curveIds[1] = ECC_SECP384R1;
+    curveSzs[1] = 48;
+    privKeys[1] = p384PrivKey;
+    privKeySzs[1] = sizeof(p384PrivKey);
+    pubKeys[1] = p384PubKey;
+    pubKeySzs[1] = sizeof(p384PubKey);
+#endif
+#ifdef HAVE_ECC521
+    curveIds[2] = ECC_SECP521R1;
+    curveSzs[2] = 66;
+    privKeys[2] = p521PrivKey;
+    privKeySzs[2] = sizeof(p521PrivKey);
+    pubKeys[2] = p521PubKey;
+    pubKeySzs[2] = sizeof(p521PubKey);
+#endif
+
+    for (i = 0; ret == 0 && i < sizeof(curveIds) / sizeof(curveIds[0]); ++i) {
+        if (curveIds[i] == 0) {
+            continue;
+        }
+
+    #if defined(HAVE_ECC_SIGN) && defined(HAVE_ECC_VERIFY)
+        ret = ecc_test_nonblock_ecdsa(curveIds[i], curveSzs[i], privKeys[i],
+                  privKeySzs[i], pubKeys[i], pubKeySzs[i], rng);
+    #endif /* HAVE_ECC_SIGN && HAVE_ECC_VERIFY */
+
+    #if defined(HAVE_ECC_DHE) && !defined(WOLFSSL_VALIDATE_ECC_KEYGEN)
+        if (ret == 0) {
+            ret = ecc_test_nonblock_dhe(curveIds[i], curveSzs[i], privKeys[i],
+                      pubKeys[i], rng);
+        }
+    #endif /* HAVE_ECC_DHE && !WOLFSSL_VALIDATE_ECC_KEYGEN */
+    }
+
+    return ret;
+}
+#endif /* WC_ECC_NONBLOCK && WOLFSSL_HAVE_SP_ECC && WOLFSSL_PUBLIC_MP */
 
 WOLFSSL_TEST_SUBROUTINE int ecc_test(void)
 {

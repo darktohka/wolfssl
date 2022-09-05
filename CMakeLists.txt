@@ -28,11 +28,11 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
      You must delete them, or cmake will refuse to work.")
 endif()
 
-project(wolfssl VERSION 5.4.0 LANGUAGES C ASM)
+project(wolfssl VERSION 5.5.0 LANGUAGES C ASM)
 
 # shared library versioning
 # increment if interfaces have been added, removed or changed
-set(LIBTOOL_CURRENT 34)
+set(LIBTOOL_CURRENT 35)
 # increment if source code has changed  set to zero if current is incremented
 set(LIBTOOL_REVISION 0)
 # increment if interfaces have been added set to zero if interfaces have been
@@ -169,6 +169,13 @@ find_package(Threads)
 # Example for map file and custom linker script
 #set(CMAKE_EXE_LINKER_FLAGS " -Xlinker -Map=output.map -T\"${CMAKE_CURRENT_SOURCE_DIR}/linker.ld\"")
 
+if(WIN32)
+# Windows cl.exe does not support the -Wextra, -Wno-unused and -Werror flags.
+set(CMAKE_C_FLAGS "-Wall ${CMAKE_C_FLAGS}")
+else()
+set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-unused -Werror ${CMAKE_C_FLAGS}")
+endif()
+
 ####################################################
 # Build Options
 ####################################################
@@ -268,26 +275,6 @@ if("${FIPS_VERSION}" STREQUAL "v1")
     override_cache(WOLFSSL_TLS13 "no")
 endif()
 
-# DTLS v1.3
-add_option("WOLFSSL_DTLS13"
-    "Enable wolfSSL DTLS v1.3 (default: disabled)"
-    "no" "yes;no")
-
-if(WOLFSSL_DTLS13)
-    if (NOT WOLFSSL_DTLS)
-      message(FATAL_ERROR "DTLS13 requires DTLS")
-    endif()
-    if (NOT WOLFSSL_TLS13)
-      message(FATAL_ERROR "DTLS13 requires TLS13")
-    endif()
-    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_DTLS13")
-    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_W64_WRAPPER")
-
-    if (WOLFSSL_AES)
-      list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_AES_DIRECT")
-    endif()
-endif()
-
 # Post-handshake authentication
 add_option("WOLFSSL_POSTAUTH"
     "Enable wolfSSL Post-handshake Authentication (default: disabled)"
@@ -306,9 +293,9 @@ endif()
 # Hello Retry Request Cookie
 add_option("WOLFSSL_HRR_COOKIE"
     "Enable the server to send Cookie Extension in HRR with state (default: disabled)"
-    "no" "yes;no")
+    "undefined" "yes;no;undefined")
 
-if(WOLFSSL_HRR_COOKIE)
+if("${WOLFSSL_HRR_COOKIE}" STREQUAL "yes")
     if(NOT WOLFSSL_TLS13)
         message(WARNING "TLS 1.3 is disabled - disabling HRR Cookie")
         override_cache(WOLFSSL_HRR_COOKIE "no")
@@ -316,6 +303,42 @@ if(WOLFSSL_HRR_COOKIE)
         list(APPEND WOLFSSL_DEFINITIONS
             "-DWOLFSSL_SEND_HRR_COOKIE")
     endif()
+endif()
+
+# DTLS v1.3
+add_option("WOLFSSL_DTLS13"
+    "Enable wolfSSL DTLS v1.3 (default: disabled)"
+    "no" "yes;no")
+
+if(WOLFSSL_DTLS13)
+    if (NOT WOLFSSL_DTLS)
+      message(FATAL_ERROR "DTLS13 requires DTLS")
+    endif()
+    if (NOT WOLFSSL_TLS13)
+      message(FATAL_ERROR "DTLS13 requires TLS13")
+    endif()
+    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_DTLS13")
+    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_W64_WRAPPER")
+    if ("${WOLFSSL_HRR_COOKIE}" STREQUAL "undefined")
+      message(WARNING "DTLS1.3 is enabled - enabling HRR Cookie")
+      override_cache(WOLFSSL_HRR_COOKIE "yes")
+      list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_SEND_HRR_COOKIE")
+    endif()
+    if (WOLFSSL_AES)
+      list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_AES_DIRECT")
+    endif()
+endif()
+
+# DTLS ConnectionID support
+add_option("WOLFSSL_DTLS_CID"
+    "Enables wolfSSL DTLS CID (default: disabled)"
+    "no" "yes;no")
+
+if(WOLFSSL_DTLS_CID)
+    if(NOT WOLFSSL_DTLS13)
+        message(FATAL_ERROR "CID are supported only for DTLSv1.3")
+    endif()
+    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_DTLS_CID")
 endif()
 
 # RNG
@@ -894,6 +917,7 @@ else()
 endif()
 if(WOLFSSL_RSA_PSS)
     list(APPEND WOLFSSL_DEFINITIONS "-DWC_RSA_PSS")
+    list(APPEND WOLFSSL_DEFINITIONS "-DWOLFSSL_PSS_LONG_SALT")
 endif()
 
 # DH

@@ -3551,6 +3551,7 @@ static int wolfssl_evp_digest_pk_final(WOLFSSL_EVP_MD_CTX *ctx,
     }
     else {
         WOLFSSL_EVP_MD_CTX ctxCopy;
+        wolfSSL_EVP_MD_CTX_init(&ctxCopy);
 
         if (wolfSSL_EVP_MD_CTX_copy_ex(&ctxCopy, ctx) != WOLFSSL_SUCCESS)
             return WOLFSSL_FAILURE;
@@ -4863,8 +4864,10 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
                 case WC_HASH_TYPE_MD5_SHA:
                 case WC_HASH_TYPE_BLAKE2B:
                 case WC_HASH_TYPE_BLAKE2S:
-            #ifndef WOLFSSL_NO_SHAKE256
+            #ifndef WOLFSSL_NO_SHAKE128
                 case WC_HASH_TYPE_SHAKE128:
+            #endif
+            #ifndef WOLFSSL_NO_SHAKE256
                 case WC_HASH_TYPE_SHAKE256:
             #endif
                 default:
@@ -4882,6 +4885,7 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
     {
         if ((out == NULL) || (in == NULL)) return WOLFSSL_FAILURE;
         WOLFSSL_ENTER("EVP_CIPHER_MD_CTX_copy_ex");
+        wolfSSL_EVP_MD_CTX_cleanup(out);
         XMEMCPY(out, in, sizeof(WOLFSSL_EVP_MD_CTX));
         if (in->pctx != NULL) {
             out->pctx = wolfSSL_EVP_PKEY_CTX_new(in->pctx->pkey, NULL);
@@ -5387,8 +5391,10 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
                 case WC_HASH_TYPE_MD5_SHA:
                 case WC_HASH_TYPE_BLAKE2B:
                 case WC_HASH_TYPE_BLAKE2S:
-            #ifndef WOLFSSL_NO_SHAKE256
+            #ifndef WOLFSSL_NO_SHAKE128
                 case WC_HASH_TYPE_SHAKE128:
+            #endif
+            #ifndef WOLFSSL_NO_SHAKE256
                 case WC_HASH_TYPE_SHAKE256:
             #endif
                 default:
@@ -5623,6 +5629,13 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
     #endif /* HAVE_AESGCM && WOLFSSL_AESGCM_STREAM */
 #endif /* not FIPS or FIPS v2+ */
             ctx->cipherType = WOLFSSL_EVP_CIPH_TYPE_INIT;  /* not yet initialized  */
+#if defined(HAVE_CHACHA) && defined(HAVE_POLY1305)
+            if (ctx->key) {
+                ForceZero(ctx->key, ctx->keyLen);
+                XFREE(ctx->key, NULL, DYNAMIC_TYPE_OPENSSL);
+                ctx->key = NULL;
+            }
+#endif
             ctx->keyLen     = 0;
 #ifdef HAVE_AESGCM
             if (ctx->gcmBuffer) {
@@ -6617,8 +6630,23 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
                 ctx->enc    = (byte) enc;
             }
 
-            if (key != NULL && iv != NULL && wc_ChaCha20Poly1305_Init(
-                    &ctx->cipher.chachaPoly, key, iv, enc) != 0) {
+            /* wolfSSL_EVP_CipherInit() may be called multiple times to
+             * set key or iv alone. A common use case is to set key
+             * and then init with another iv again and again after
+             * update/finals. We need to preserve the key for those calls
+             * since wc_ChaCha20Poly1305_Init() does not. */
+            if (key != NULL) {
+                if (!ctx->key) {
+                    ctx->key = (byte*)XMALLOC(ctx->keyLen, NULL,
+                                              DYNAMIC_TYPE_OPENSSL);
+                    if (!ctx->key) {
+                        return MEMORY_E;
+                    }
+                }
+                XMEMCPY(ctx->key, key, ctx->keyLen);
+            }
+            if ((ctx->key != NULL && iv != NULL) && wc_ChaCha20Poly1305_Init(
+                    &ctx->cipher.chachaPoly, ctx->key, iv, ctx->enc) != 0) {
                 WOLFSSL_MSG("wc_ChaCha20Poly1305_Init() failed");
                 return WOLFSSL_FAILURE;
             }
@@ -7246,8 +7274,10 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
             case WC_HASH_TYPE_MD5_SHA:
             case WC_HASH_TYPE_BLAKE2B:
             case WC_HASH_TYPE_BLAKE2S:
-        #ifndef WOLFSSL_NO_SHAKE256
+        #ifndef WOLFSSL_NO_SHAKE128
             case WC_HASH_TYPE_SHAKE128:
+        #endif
+        #ifndef WOLFSSL_NO_SHAKE256
             case WC_HASH_TYPE_SHAKE256:
         #endif
             default:
@@ -7357,8 +7387,10 @@ int wolfSSL_EVP_MD_type(const WOLFSSL_EVP_MD* type)
             case WC_HASH_TYPE_MD5_SHA:
             case WC_HASH_TYPE_BLAKE2B:
             case WC_HASH_TYPE_BLAKE2S:
-        #ifndef WOLFSSL_NO_SHAKE256
+        #ifndef WOLFSSL_NO_SHAKE128
             case WC_HASH_TYPE_SHAKE128:
+        #endif
+        #ifndef WOLFSSL_NO_SHAKE256
             case WC_HASH_TYPE_SHAKE256:
         #endif
             default:

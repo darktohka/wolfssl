@@ -526,6 +526,11 @@ static int wolfSSL_BIO_MEMORY_write(WOLFSSL_BIO* bio, const void* data,
         return WOLFSSL_FAILURE;
     }
 
+    if (bio->mem_buf->data == NULL) {
+        WOLFSSL_MSG("Buffer data is NULL");
+        return WOLFSSL_FAILURE;
+    }
+
     XMEMCPY(bio->mem_buf->data + bio->wrSz, data, len);
     bio->ptr = bio->mem_buf->data;
     bio->num = (int)bio->mem_buf->max;
@@ -1865,7 +1870,7 @@ int wolfSSL_BIO_meth_set_create(WOLFSSL_BIO_METHOD *biom,
 int wolfSSL_BIO_meth_set_destroy(WOLFSSL_BIO_METHOD *biom,
         wolfSSL_BIO_meth_destroy_cb biom_destroy)
 {
-    WOLFSSL_STUB("wolfSSL_BIO_meth_set_destroy");
+    WOLFSSL_ENTER("wolfSSL_BIO_meth_set_destroy");
     if (biom) {
         biom->freeCb = biom_destroy;
         return WOLFSSL_SUCCESS;
@@ -3194,7 +3199,8 @@ void wolfSSL_BIO_clear_retry_flags(WOLFSSL_BIO* bio)
     WOLFSSL_ENTER("wolfSSL_BIO_clear_retry_flags");
 
     if (bio)
-        bio->flags &= ~(WOLFSSL_BIO_FLAG_READ|WOLFSSL_BIO_FLAG_RETRY);
+        bio->flags &= ~(WOLFSSL_BIO_FLAG_READ | WOLFSSL_BIO_FLAG_WRITE |
+                        WOLFSSL_BIO_FLAG_RETRY);
 }
 
 int wolfSSL_BIO_should_retry(WOLFSSL_BIO *bio)

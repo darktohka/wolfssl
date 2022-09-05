@@ -798,7 +798,7 @@ enum
     NID_inhibit_any_policy = 168,      /* 2.5.29.54 */
     NID_tlsfeature = 1020,             /* id-pe 24 */
     NID_buildingName = 1494,
-
+    NID_distinguishedName = 25,
 
     NID_dnQualifier = 174,             /* 2.5.4.46 */
     NID_commonName = 14,               /* CN Changed to not conflict
@@ -1095,6 +1095,12 @@ enum Key_Sum {
     DILITHIUM_AES_LEVEL2k = 217,/* 1.3.6.1.4.1.2.267.11.4.4 */
     DILITHIUM_AES_LEVEL3k = 221,/* 1.3.6.1.4.1.2.267.11.6.5 + 1 (See GetOID() in asn.c) */
     DILITHIUM_AES_LEVEL5k = 224,/* 1.3.6.1.4.1.2.267.11.8.7 */
+    SPHINCS_FAST_LEVEL1k   = 281, /* 1 3 9999 6 7 4 */
+    SPHINCS_FAST_LEVEL3k   = 283, /* 1 3 9999 6 8 3 + 2 (See GetOID() in asn.c) */
+    SPHINCS_FAST_LEVEL5k   = 282, /* 1 3 9999 6 9 3 */
+    SPHINCS_SMALL_LEVEL1k  = 287, /* 1 3 9999 6 7 10 */
+    SPHINCS_SMALL_LEVEL3k  = 285, /* 1 3 9999 6 8 7 */
+    SPHINCS_SMALL_LEVEL5k  = 286, /* 1 3 9999 6 9 7 */
 };
 
 #if !defined(NO_AES) || defined(HAVE_PKCS7)
@@ -1411,6 +1417,7 @@ struct SignatureCtx {
     #ifdef HAVE_PQC
         struct falcon_key* falcon;
         struct dilithium_key* dilithium;
+        struct sphincs_key* sphincs;
     #endif
         void* ptr;
     } key;
@@ -1438,6 +1445,11 @@ struct SignatureCtx {
 #if defined(WOLFSSL_RENESAS_TSIP_TLS) || defined(WOLFSSL_RENESAS_SCEPROTECT) ||\
     defined(HAVE_PK_CALLBACKS)
     CertAttribute  CertAtt;
+#endif
+#ifdef WC_RSA_PSS
+    enum wc_HashType hash;
+    int mgf;
+    int saltLen;
 #endif
 #endif
 };
@@ -2228,6 +2240,12 @@ enum cert_enums {
     DILITHIUM_AES_LEVEL2_KEY = 21,
     DILITHIUM_AES_LEVEL3_KEY = 22,
     DILITHIUM_AES_LEVEL5_KEY = 23,
+    SPHINCS_FAST_LEVEL1_KEY  = 24,
+    SPHINCS_FAST_LEVEL3_KEY  = 25,
+    SPHINCS_FAST_LEVEL5_KEY  = 26,
+    SPHINCS_SMALL_LEVEL1_KEY = 27,
+    SPHINCS_SMALL_LEVEL3_KEY = 28,
+    SPHINCS_SMALL_LEVEL5_KEY = 29,
 };
 
 #endif /* WOLFSSL_CERT_GEN */
@@ -2409,6 +2427,8 @@ struct RevokedCert {
     byte         serialNumber[EXTERNAL_SERIAL_SIZE];
     int          serialSz;
     RevokedCert* next;
+    byte         revDate[MAX_DATE_SIZE];
+    byte         revDateFormat;
 };
 
 typedef struct DecodedCRL DecodedCRL;
@@ -2426,12 +2446,18 @@ struct DecodedCRL {
     byte    lastDateFormat;          /* format of last date */
     byte    nextDateFormat;          /* format of next date */
     RevokedCert* certs;              /* revoked cert list  */
+#if defined(OPENSSL_EXTRA)
+    byte*   issuer;                  /* full name including common name  */
+    word32  issuerSz;                /* length of the issuer             */
+#endif
     int          totalCerts;         /* number on list     */
+    int          version;            /* version of cert    */
     void*   heap;
 #ifndef NO_SKID
     byte    extAuthKeyIdSet;
     byte    extAuthKeyId[SIGNER_DIGEST_SIZE]; /* Authority Key ID        */
 #endif
+    int          crlNumber;          /* CRL number extension  */
 };
 
 WOLFSSL_LOCAL void InitDecodedCRL(DecodedCRL* dcrl, void* heap);
@@ -2460,7 +2486,8 @@ WOLFSSL_LOCAL void FreeDecodedCRL(DecodedCRL* dcrl);
     || (defined(HAVE_ED448) && defined(HAVE_ED448_KEY_IMPORT)) \
     || (defined(HAVE_CURVE448) && defined(HAVE_CURVE448_KEY_IMPORT)) \
     || (defined(HAVE_PQC) && defined(HAVE_FALCON)) \
-    || (defined(HAVE_PQC) && defined(HAVE_DILITHIUM)))
+    || (defined(HAVE_PQC) && defined(HAVE_DILITHIUM)) \
+    || (defined(HAVE_PQC) && defined(HAVE_SPHINCS)))
 WOLFSSL_LOCAL int DecodeAsymKey(const byte* input, word32* inOutIdx,
     word32 inSz, byte* privKey, word32* privKeyLen, byte* pubKey,
     word32* pubKeyLen, int keyType);

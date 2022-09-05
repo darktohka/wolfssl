@@ -7,7 +7,7 @@
 #
 AC_COPYRIGHT([Copyright (C) 2006-2020 wolfSSL Inc.])
 AC_PREREQ([2.69])
-AC_INIT([wolfssl],[5.4.0],[https://github.com/wolfssl/wolfssl/issues],[wolfssl],[https://www.wolfssl.com])
+AC_INIT([wolfssl],[5.5.0],[https://github.com/wolfssl/wolfssl/issues],[wolfssl],[https://www.wolfssl.com])
 AC_CONFIG_AUX_DIR([build-aux])
 
 # The following sets CFLAGS to empty if unset on command line.  We do not
@@ -38,7 +38,7 @@ LT_INIT([disable-static win32-dll])
 AC_ARG_VAR(EXTRA_CFLAGS, [Extra CFLAGS to add to autoconf-computed arg list.  Can also supply directly to make.])
 
 #shared library versioning
-WOLFSSL_LIBRARY_VERSION=34:0:0
+WOLFSSL_LIBRARY_VERSION=35:0:0
 #                        | | |
 #                 +------+ | +---+
 #                 |        |     |
@@ -743,7 +743,6 @@ then
     if test "$ENABLED_LINUXKM_DEFAULTS" != "yes"
     then
         test "$enable_compkey" = "" && enable_compkey=yes
-        test "$enable_quic" = "" && enable_quic=yes
         AM_CFLAGS="$AM_CFLAGS -DHAVE_CRL_IO -DHAVE_IO_TIMEOUT"
     fi
 
@@ -1079,7 +1078,7 @@ fi
 AC_ARG_ENABLE([hrrcookie],
     [AS_HELP_STRING([--enable-hrrcookie],[Enable the server to send Cookie Extension in HRR with state (default: disabled)])],
     [ ENABLED_SEND_HRR_COOKIE=$enableval ],
-    [ ENABLED_SEND_HRR_COOKIE=no ]
+    [ ENABLED_SEND_HRR_COOKIE=undefined ]
     )
 if test "$ENABLED_SEND_HRR_COOKIE" = "yes"
 then
@@ -2606,6 +2605,13 @@ then
     AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_SHA3_SMALL"
 fi
 
+# SHAKE128
+AC_ARG_ENABLE([shake128],
+    [AS_HELP_STRING([--enable-shake128],[Enable wolfSSL SHAKE128 support (default: disabled)])],
+    [ ENABLED_SHAKE128=$enableval ],
+    [ ENABLED_SHAKE128=no ]
+    )
+
 # SHAKE256
 AC_ARG_ENABLE([shake256],
     [AS_HELP_STRING([--enable-shake256],[Enable wolfSSL SHAKE256 support (default: disabled)])],
@@ -2927,6 +2933,10 @@ AC_ARG_ENABLE([curve25519],
     [ ENABLED_CURVE25519=no ]
     )
 
+if test "$ENABLED_QUIC" = "yes" && test "$ENABLED_CURVE25519" = "no"
+then
+    ENABLED_CURVE25519=yes
+fi
 
 if test "$ENABLED_OPENSSH" = "yes" && test "x$ENABLED_FIPS" = "xno"
 then
@@ -3750,11 +3760,32 @@ then
         then
                 AC_MSG_ERROR([You need to enable both DTLS and TLSv1.3 to use DTLSv1.3])
         fi
+        if test "x$ENABLED_SEND_HRR_COOKIE" == "xundefined"
+        then
+                AC_MSG_NOTICE([DTLSv1.3 is enabled, enabling HRR cookie])
+                AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_SEND_HRR_COOKIE"
+                ENABLED_SEND_HRR_COOKIE="yes"
+        fi
   AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_DTLS13 -DWOLFSSL_W64_WRAPPER"
   if test "x$ENABLED_AES" = "xyes"
   then
       AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_AES_DIRECT"
   fi
+fi
+
+# DTLS CID support
+AC_ARG_ENABLE([dtlscid],
+    [AS_HELP_STRING([--enable-dtlscid],[Enable wolfSSL DTLS ConnectionID (default: disabled)])],
+    [ ENABLED_DTLS_CID=$enableval ],
+    [ ENABLED_DTLS_CID=no ]
+    )
+if test "x$ENABLED_DTLS_CID" = "xyes"
+then
+        if test "x$ENABLED_DTLS13" != "xyes"
+        then
+                AC_MSG_ERROR([You need to enable DTLSv1.3 to use DTLS ConnectionID])
+        fi
+  AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_DTLS_CID"
 fi
 
 # CODING
@@ -3991,6 +4022,10 @@ AS_CASE([$FIPS_VERSION],
         AS_IF([test "$ENABLED_WOLFSSH" != "yes" && (test "$FIPS_VERSION" != "v5-dev" || test "$enable_ssh" != "no")],
             [enable_ssh="yes"])
 
+        # Shake128 is a SHA-3 algorithm not in our FIPS algorithm list
+        AS_IF([test "$ENABLED_SHAKE128" != "no" && (test "$FIPS_VERSION" != "v5-dev" || test "$enable_shake128" != "yes")],
+            [ENABLED_SHAKE128=no; AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_NO_SHAKE128"])
+
         # Shake256 is a SHA-3 algorithm not in our FIPS algorithm list
         AS_IF([test "$ENABLED_SHAKE256" != "no" && (test "$FIPS_VERSION" != "v5-dev" || test "$enable_shake256" != "yes")],
             [ENABLED_SHAKE256=no; AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_NO_SHAKE256"])
@@ -4144,6 +4179,21 @@ AS_CASE([$SELFTEST_VERSION],
 if test "$ENABLED_SHA3" != "no" && test "$ENABLED_32BIT" = "no"
 then
     AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_SHA3"
+fi
+
+# Set SHAKE128 flags
+# FIPS does not support SHAKE 128
+AS_IF([test "x$ENABLED_FIPS" = "xyes"],[ENABLED_SHAKE128="no"])
+
+if test "$ENABLED_SHAKE128" != "no" && test "$ENABLED_32BIT" = "no"
+then
+    AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_SHAKE128"
+    if test "$ENABLED_SHA3" = "no"
+    then
+        AC_MSG_ERROR([Must have SHA-3 enabled: --enable-sha3])
+    fi
+else
+    AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_NO_SHAKE128"
 fi
 
 # Set SHAKE256 flags
@@ -5708,12 +5758,6 @@ then
 
     # FTPS server requires pointer to session cache
     AM_CFLAGS="$AM_CFLAGS -DNO_SESSION_CACHE_REF"
-
-    if test "x$ENABLED_QUIC" = "xno"
-    then
-        ENABLED_QUIC="yes"
-        AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_QUIC"
-    fi
 
     AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_DES_ECB"
 fi
@@ -8080,6 +8124,7 @@ AM_CONDITIONAL([BUILD_DO178],[test "x$ENABLED_DO178" = "xyes"])
 AM_CONDITIONAL([BUILD_PSA],[test "x$ENABLED_PSA" = "xyes"])
 AM_CONDITIONAL([BUILD_DTLS13],[test "x$ENABLED_DTLS13" = "xyes"])
 AM_CONDITIONAL([BUILD_QUIC],[test "x$ENABLED_QUIC" = "xyes"])
+AM_CONDITIONAL([BUILD_DTLS_CID],[test "x$ENABLED_DTLS_CID" = "xyes"])
 
 if test "$ENABLED_REPRODUCIBLE_BUILD" != "yes" &&
    (test "$ax_enable_debug" = "yes" ||
@@ -8348,6 +8393,7 @@ echo "   * SHA-224:                    $ENABLED_SHA224"
 echo "   * SHA-384:                    $ENABLED_SHA384"
 echo "   * SHA-512:                    $ENABLED_SHA512"
 echo "   * SHA3:                       $ENABLED_SHA3"
+echo "   * SHAKE128:                   $ENABLED_SHAKE128"
 echo "   * SHAKE256:                   $ENABLED_SHAKE256"
 echo "   * BLAKE2:                     $ENABLED_BLAKE2"
 echo "   * BLAKE2S:                    $ENABLED_BLAKE2S"

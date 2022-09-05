@@ -613,6 +613,7 @@ typedef struct callback_functions {
 #endif
     int devId;
     int return_code;
+    int last_err;
     unsigned char isSharedCtx:1;
     unsigned char loadToSSL:1;
     unsigned char ticNoInit:1;
@@ -2093,32 +2094,33 @@ static WC_INLINE void udp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
         }
     #endif
 
+    if (args != NULL && args->signal != NULL) {
 #if defined(_POSIX_THREADS) && !defined(__MINGW32__)
-    /* signal ready to accept data */
-    {
-    tcp_ready* ready = args->signal;
-    PTHREAD_CHECK_RET(pthread_mutex_lock(&ready->mutex));
-    ready->ready = 1;
-    ready->port = port;
-    PTHREAD_CHECK_RET(pthread_cond_signal(&ready->cond));
-    PTHREAD_CHECK_RET(pthread_mutex_unlock(&ready->mutex));
-    }
+        /* signal ready to accept data */
+        tcp_ready* ready = args->signal;
+        PTHREAD_CHECK_RET(pthread_mutex_lock(&ready->mutex));
+        ready->ready = 1;
+        ready->port = port;
+        PTHREAD_CHECK_RET(pthread_cond_signal(&ready->cond));
+        PTHREAD_CHECK_RET(pthread_mutex_unlock(&ready->mutex));
 #elif defined (WOLFSSL_TIRTOS)
-    /* Need mutex? */
-    tcp_ready* ready = args->signal;
-    ready->ready = 1;
-    ready->port = port;
+        /* Need mutex? */
+        tcp_ready* ready = args->signal;
+        ready->ready = 1;
+        ready->port = port;
 #elif defined(NETOS)
-    {
         tcp_ready* ready = args->signal;
         (void)tx_mutex_get(&ready->mutex, TX_WAIT_FOREVER);
         ready->ready = 1;
         ready->port = port;
         (void)tx_mutex_put(&ready->mutex);
-    }
 #else
-    (void)port;
+        (void)port;
 #endif
+    }
+    else {
+        fprintf(stderr, "args or args->signal was NULL. Not setting ready info.");
+    }
 
     *clientfd = *sockfd;
 }
@@ -2783,6 +2785,14 @@ static WC_INLINE int myVerify(int preverify, WOLFSSL_X509_STORE_CTX* store)
                                       wolfSSL_X509_get_subject_name(peer), 0, 0);
         printf("\tPeer's cert info:\n issuer : %s\n subject: %s\n", issuer,
                                                                   subject);
+
+#if defined(OPENSSL_ALL) || defined(WOLFSSL_QT)
+        /* preverify needs to be self-signer error for Qt compat.
+         * Should be ASN_SELF_SIGNED_E */
+        if (XSTRCMP(issuer, subject) == 0 && preverify == ASN_NO_SIGNER_E)
+            return 0;
+#endif
+
         XFREE(subject, 0, DYNAMIC_TYPE_OPENSSL);
         XFREE(issuer,  0, DYNAMIC_TYPE_OPENSSL);
 #if defined(SHOW_CERTS) && !defined(NO_FILESYSTEM)
@@ -5437,10 +5447,19 @@ static WC_INLINE int process_handshake_messages(WOLFSSL* ssl, int blocking,
 }
 #endif /* HAVE_SESSION_TICKET || WOLFSSL_DTLS13 */
 
+static WC_INLINE void printBuffer(const byte *buf, int size)
+{
+    int i;
+    for (i = 0; i < size; i++)
+        printf("%x", buf[i]);
+}
+
 #if !defined(NO_FILESYSTEM) && defined(OPENSSL_EXTRA) && \
     defined(DEBUG_UNIT_TEST_CERTS)
 void DEBUG_WRITE_CERT_X509(WOLFSSL_X509* x509, const char* fileName);
 void DEBUG_WRITE_DER(const byte* der, int derSz, const char* fileName);
 #endif
+
+#define DTLS_CID_BUFFER_SIZE 256
 
 #endif /* wolfSSL_TEST_H */

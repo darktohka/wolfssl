@@ -2721,6 +2721,7 @@ extern void uITRON4_free(void *p) ;
 #define HAVE_PQC
 #define HAVE_FALCON
 #define HAVE_DILITHIUM
+#define HAVE_SPHINCS
 #define HAVE_KYBER
 #endif
 
@@ -2773,6 +2774,10 @@ extern void uITRON4_free(void *p) ;
 #if defined(WOLFSSL_DTLS13) && (!defined(WOLFSSL_DTLS) || \
                                 !defined(WOLFSSL_TLS13))
 #error "DTLS v1.3 requires both WOLFSSL_TLS13 and WOLFSSL_DTLS"
+#endif
+
+#if defined(WOLFSSL_DTLS_CID) && !defined(WOLFSSL_DTLS13)
+#error "ConnectionID is supported for DTLSv1.3 only"
 #endif
 
 /* RSA Key Checking is disabled by default unless WOLFSSL_RSA_KEY_CHECK is

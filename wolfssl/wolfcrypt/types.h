@@ -39,9 +39,6 @@ decouple library dependencies with standard string, memory and so on.
     #endif
 
 
-    #define WOLFSSL_ABI
-            /* Tag for all the APIs that are a part of the fixed ABI. */
-
     /*
      * This struct is used multiple time by other structs and
      * needs to be defined somewhere that all structs can import
@@ -948,6 +945,7 @@ typedef struct w64wrapper {
         DYNAMIC_TYPE_FALCON       = 95,
         DYNAMIC_TYPE_SESSION      = 96,
         DYNAMIC_TYPE_DILITHIUM    = 97,
+        DYNAMIC_TYPE_SPHINCS      = 98,
         DYNAMIC_TYPE_SNIFFER_SERVER     = 1000,
         DYNAMIC_TYPE_SNIFFER_SESSION    = 1001,
         DYNAMIC_TYPE_SNIFFER_PB         = 1002,
@@ -1044,8 +1042,10 @@ typedef struct w64wrapper {
 #undef _WC_HASH_TYPE_MAX
 #define _WC_HASH_TYPE_MAX WC_HASH_TYPE_SHA512_256
         #endif
-        #ifndef WOLFSSL_NO_SHAKE256
+        #ifndef WOLFSSL_NO_SHAKE128
             WC_HASH_TYPE_SHAKE128 = 18,
+        #endif
+        #ifndef WOLFSSL_NO_SHAKE256
             WC_HASH_TYPE_SHAKE256 = 19,
 #undef _WC_HASH_TYPE_MAX
 #define _WC_HASH_TYPE_MAX WC_HASH_TYPE_SHAKE256
