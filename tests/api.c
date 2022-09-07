@@ -21426,10 +21426,20 @@ static int test_wc_ed25519_make_key(void)
 #if defined(HAVE_ED25519)
     ed25519_key     key;
     WC_RNG          rng;
+    unsigned char   pubkey[ED25519_PUB_KEY_SIZE];
 
     ret = wc_InitRng(&rng);
     if (ret == 0) {
         ret = wc_ed25519_init(&key);
+    }
+    if (ret == 0) {
+        ret = wc_ed25519_make_public(&key, pubkey, sizeof(pubkey));
+        if (ret == ECC_PRIV_KEY_E) {
+            ret = 0;
+        }
+        else if (ret == 0) {
+            ret = -1;
+        }
     }
     printf(testingFmt, "wc_ed25519_make_key()");
     if (ret == 0) {
@@ -23249,10 +23259,20 @@ static int test_wc_ed448_make_key(void)
 #if defined(HAVE_ED448)
     ed448_key     key;
     WC_RNG        rng;
+    unsigned char pubkey[ED448_PUB_KEY_SIZE];
 
     ret = wc_InitRng(&rng);
     if (ret == 0) {
         ret = wc_ed448_init(&key);
+    }
+    if (ret == 0) {
+        ret = wc_ed448_make_public(&key, pubkey, sizeof(pubkey));
+        if (ret == ECC_PRIV_KEY_E) {
+            ret = 0;
+        }
+        else if (ret == 0) {
+            ret = -1;
+        }
     }
     printf(testingFmt, "wc_ed448_make_key()");
     if (ret == 0) {
@@ -52306,6 +52326,68 @@ static int test_wolfssl_EVP_chacha20_poly1305(void)
     return 0;
 }
 
+static int test_wolfssl_EVP_chacha20(void)
+{
+#if defined(OPENSSL_EXTRA) && defined(HAVE_CHACHA)
+    byte key[CHACHA_MAX_KEY_SZ];
+    byte iv [WOLFSSL_EVP_CHACHA_IV_BYTES];
+    byte plainText[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    byte cipherText[sizeof(plainText)];
+    byte decryptedText[sizeof(plainText)];
+    EVP_CIPHER_CTX* ctx;
+    int outSz;
+
+    printf(testingFmt, "test_wolfssl_EVP_chacha20");
+
+    /* Encrypt. */
+    AssertNotNull((ctx = EVP_CIPHER_CTX_new()));
+    AssertIntEQ(EVP_EncryptInit_ex(ctx, EVP_chacha20(), NULL, NULL,
+                NULL), WOLFSSL_SUCCESS);
+    /* Any tag length must fail - not an AEAD cipher. */
+    AssertIntEQ(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_TAG,
+                16, NULL), WOLFSSL_FAILURE);
+    AssertIntEQ(EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv), WOLFSSL_SUCCESS);
+    AssertIntEQ(EVP_EncryptUpdate(ctx, cipherText, &outSz, plainText,
+                sizeof(plainText)), WOLFSSL_SUCCESS);
+    AssertIntEQ(outSz, sizeof(plainText));
+    AssertIntEQ(EVP_EncryptFinal_ex(ctx, cipherText, &outSz), WOLFSSL_SUCCESS);
+    AssertIntEQ(outSz, 0);
+    EVP_CIPHER_CTX_free(ctx);
+
+    /* Decrypt. */
+    AssertNotNull((ctx = EVP_CIPHER_CTX_new()));
+    AssertIntEQ(EVP_DecryptInit_ex(ctx, EVP_chacha20(), NULL, NULL,
+                NULL), WOLFSSL_SUCCESS);
+    AssertIntEQ(EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv), WOLFSSL_SUCCESS);
+    AssertIntEQ(EVP_DecryptUpdate(ctx, decryptedText, &outSz, cipherText,
+                sizeof(cipherText)), WOLFSSL_SUCCESS);
+    AssertIntEQ(outSz, sizeof(cipherText));
+    AssertIntEQ(EVP_DecryptFinal_ex(ctx, decryptedText, &outSz),
+                WOLFSSL_SUCCESS);
+    AssertIntEQ(outSz, 0);
+    EVP_CIPHER_CTX_free(ctx);
+
+    /* Test partial Inits. CipherInit() allow setting of key and iv
+     * in separate calls. */
+    AssertNotNull((ctx = EVP_CIPHER_CTX_new()));
+    AssertIntEQ(wolfSSL_EVP_CipherInit(ctx, EVP_chacha20(),
+                key, NULL, 1), WOLFSSL_SUCCESS);
+    AssertIntEQ(wolfSSL_EVP_CipherInit(ctx, NULL, NULL, iv, 1),
+                WOLFSSL_SUCCESS);
+    AssertIntEQ(EVP_DecryptUpdate(ctx, decryptedText, &outSz, cipherText,
+                sizeof(cipherText)), WOLFSSL_SUCCESS);
+    AssertIntEQ(outSz, sizeof(cipherText));
+    AssertIntEQ(EVP_DecryptFinal_ex(ctx, decryptedText, &outSz),
+            WOLFSSL_SUCCESS);
+    AssertIntEQ(outSz, 0);
+    EVP_CIPHER_CTX_free(ctx);
+
+    printf(resultFmt, passed);
+#endif
+
+    return 0;
+}
+
 static int test_wolfSSL_EVP_PKEY_hkdf(void)
 {
 #if defined(OPENSSL_EXTRA) && defined(HAVE_HKDF)
@@ -58206,6 +58288,7 @@ TEST_CASE testCases[] = {
     TEST_DECL(test_wolfssl_EVP_aes_gcm_AAD_2_parts),
     TEST_DECL(test_wolfssl_EVP_aes_gcm),
     TEST_DECL(test_wolfssl_EVP_chacha20_poly1305),
+    TEST_DECL(test_wolfssl_EVP_chacha20),
     TEST_DECL(test_wolfSSL_EVP_PKEY_hkdf),
     TEST_DECL(test_wolfSSL_PKEY_up_ref),
     TEST_DECL(test_wolfSSL_EVP_Cipher_extra),
