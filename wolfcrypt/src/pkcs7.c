@@ -8469,7 +8469,7 @@ static int wc_PKCS7_DecryptKtri(PKCS7* pkcs7, byte* in, word32 inSz,
 {
     int length, encryptedKeySz = 0, ret = 0;
     int keySz, version, sidType = 0;
-    word32 encOID;
+    word32 encOID = 0;
     word32 keyIdx;
     byte   issuerHash[KEYID_SIZE];
     byte*  outKey   = NULL;
@@ -8483,9 +8483,6 @@ static int wc_PKCS7_DecryptKtri(PKCS7* pkcs7, byte* in, word32 inSz,
 #endif
 #ifdef WC_RSA_BLINDING
     WC_RNG rng;
-#endif
-#ifndef WC_NO_RSA_OAEP
-    word32 outLen;
 #endif
 
     byte* encryptedKey = NULL;
@@ -8654,7 +8651,7 @@ static int wc_PKCS7_DecryptKtri(PKCS7* pkcs7, byte* in, word32 inSz,
             /* key encryption algorithm must be RSA for now */
             if (encOID != RSAk
             #ifndef WC_NO_RSA_OAEP
-                && encOID != RSAESOAEPk 
+                && encOID != RSAESOAEPk
             #endif
                 )
                 return ALGO_ID_E;
@@ -8778,25 +8775,25 @@ static int wc_PKCS7_DecryptKtri(PKCS7* pkcs7, byte* in, word32 inSz,
             #ifndef WC_NO_RSA_OAEP
                     }
                     else {
-                        outLen =  wc_RsaEncryptSize(privKey);
-                        outKey = (byte*)XMALLOC(outLen, pkcs7->heap, 
+                        word32 outLen = wc_RsaEncryptSize(privKey);
+                        outKey = (byte*)XMALLOC(outLen, pkcs7->heap,
                                                     DYNAMIC_TYPE_TMP_BUFFER);
                         if (!outKey) {
                             WOLFSSL_MSG("Failed to allocate out key buffer");
                             wc_FreeRsaKey(privKey);
-                            XFREE(encryptedKey, pkcs7->heap, 
+                            XFREE(encryptedKey, pkcs7->heap,
                                                     DYNAMIC_TYPE_WOLF_BIGINT);
                             #ifdef WOLFSSL_SMALL_STACK
-                                    XFREE(privKey, pkcs7->heap, 
+                                    XFREE(privKey, pkcs7->heap,
                                                     DYNAMIC_TYPE_TMP_BUFFER);
                             #endif
                             WOLFSSL_ERROR_VERBOSE(MEMORY_E);
                             return MEMORY_E;
                         }
 
-                        keySz = wc_RsaPrivateDecrypt_ex(encryptedKey, 
-                                encryptedKeySz, outKey, outLen, privKey, 
-                                WC_RSA_OAEP_PAD, 
+                        keySz = wc_RsaPrivateDecrypt_ex(encryptedKey,
+                                encryptedKeySz, outKey, outLen, privKey,
+                                WC_RSA_OAEP_PAD,
                                 WC_HASH_TYPE_SHA, WC_MGF1SHA1, NULL, 0);
                     }
             #endif

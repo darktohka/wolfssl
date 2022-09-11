@@ -213,7 +213,9 @@ extern "C" {
  * with compiler.
  */
 #ifndef SP_WORD_SIZE
-    #if defined(NO_64BIT) || !defined(HAVE___UINT128_T)
+    #ifdef NO_64BIT
+        #define SP_WORD_SIZE 16
+    #elif !defined(HAVE___UINT128_T)
         #define SP_WORD_SIZE 32
     #else
         #define SP_WORD_SIZE 64
@@ -425,10 +427,10 @@ typedef struct sp_ecc_ctx {
      * numbers in bits that will be used.
      * Double the size to hold multiplication result.
      * Add one to accommodate extra digit used by sp_mul(), sp_mulmod(),
-     * sp_sqr(), and sp_sqrmod().
+     * sp_sqr(), sp_sqrmod() and sp_mont_red().
      */
     #define SP_INT_DIGITS                                                      \
-        (((SP_INT_BITS * 2 + SP_WORD_SIZE - 1) / SP_WORD_SIZE) + 1)
+        (((SP_INT_BITS + SP_WORD_SIZE - 1) / SP_WORD_SIZE) * 2 + 1)
 #endif
 
 #ifndef SP_INT_MAX_BITS
@@ -884,7 +886,7 @@ MP_API int sp_exptmod(sp_int* b, sp_int* e, sp_int* m, sp_int* r);
 MP_API int sp_exptmod_nct(sp_int* b, sp_int* e, sp_int* m, sp_int* r);
 #endif
 
-#ifdef WOLFSSL_SP_MATH_ALL
+#if defined(WOLFSSL_SP_MATH_ALL) || defined(OPENSSL_ALL)
 MP_API int sp_div_2d(sp_int* a, int e, sp_int* r, sp_int* rem);
 MP_API int sp_mod_2d(sp_int* a, int e, sp_int* r);
 MP_API int sp_mul_2d(sp_int* a, int e, sp_int* r);

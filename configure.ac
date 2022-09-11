@@ -975,7 +975,7 @@ AS_IF([ test "x$ENABLED_SINGLETHREADED" = "xno" ],[
                    # If AX_PTHREAD is adding -Qunused-arguments, need to prepend with -Xcompiler libtool will use it. Newer
                    # versions of clang don't need the -Q flag when using pthreads.
                    AS_CASE([$PTHREAD_CFLAGS],[-Qunused-arguments*],[PTHREAD_CFLAGS="-Xcompiler $PTHREAD_CFLAGS"])
-                   AM_CFLAGS="$AM_CFLAGS -D_POSIX_THREADS $PTHREAD_CFLAGS"
+                   AM_CFLAGS="$AM_CFLAGS $PTHREAD_CFLAGS"
                    LIBS="$LIBS $PTHREAD_LIBS"
                    ],[
                       ENABLED_SINGLETHREADED=yes
@@ -6497,6 +6497,10 @@ do
     ENABLED_SP_ASM=yes
     ;;
 
+  noasm)
+    ENABLED_SP_ASM=no
+    ;;
+
   *)
     AC_MSG_ERROR([Invalid choice of Single Precision length in bits [256, 384, 521, 1024, 2048, 3072, 4096]: $ENABLED_SP.])
     break;;
@@ -6981,6 +6985,17 @@ then
     AC_MSG_ERROR([please use --with-libz if enabling mcapi.])
 fi
 
+# Asynchronous crypto using software (i.e. not hardware). Required for
+# non-blocking crypto with TLS/DTLS.
+AC_ARG_ENABLE([asynccrypt-sw],
+    [AS_HELP_STRING([--enable-asynccrypt-sw],[Enable asynchronous software-based crypto (default: disabled)])],
+    [ ENABLED_ASYNCCRYPT_SW=$enableval ],
+    [ ENABLED_ASYNCCRYPT_SW=no ]
+    )
+if test "$ENABLED_ASYNCCRYPT_SW" = "yes"
+then
+    AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_ASYNC_CRYPT_SW"
+fi
 
 # Asynchronous Crypto
 AC_ARG_ENABLE([asynccrypt],
@@ -6993,11 +7008,13 @@ if test "$ENABLED_ASYNCCRYPT" = "yes"
 then
     AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_ASYNC_CRYPT -DHAVE_WOLF_EVENT -DHAVE_WOLF_BIGINT -DWOLFSSL_NO_HASH_RAW"
 
-    # if no async hardware then use simulator for testing
-    if test "x$ENABLED_CAVIUM" = "xno" && test "x$ENABLED_INTEL_QA" = "xno"
+    # If no async backend (hardware or software) has been explicitly enabled,
+    # use the software backend for testing.
+    if test "x$ENABLED_CAVIUM" = "xno" && test "x$ENABLED_INTEL_QA" = "xno" &&
+       test "x$ENABLED_ASYNCCRYPT_SW" = "xno"
     then
         # Async threading is Linux specific
-        AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_ASYNC_CRYPT_TEST"
+        AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_ASYNC_CRYPT_SW"
     fi
 fi
 

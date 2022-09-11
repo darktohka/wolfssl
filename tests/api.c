@@ -839,6 +839,208 @@ static int test_for_double_Free(void)
 #endif
 
 
+static int test_wolfSSL_CTX_set_cipher_list_bytes(void)
+{
+#if (defined(OPENSSL_EXTRA) || defined(WOLFSSL_SET_CIPHER_BYTES)) && \
+    (!defined(NO_WOLFSSL_CLIENT) || !defined(NO_WOLFSSL_SERVER)) && \
+    (!defined(NO_RSA) || defined(HAVE_ECC))
+    const char* testCertFile;
+    const char* testKeyFile;
+    WOLFSSL_CTX* ctx;
+    WOLFSSL* ssl;
+
+    const byte cipherList[] =
+    {
+        /* TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA */ 0xC0, 0x16,
+        /* TLS_DHE_RSA_WITH_AES_256_CBC_SHA  */ 0xC0, 0x39,
+        /* TLS_DHE_RSA_WITH_AES_128_CBC_SHA  */ 0xC0, 0x33,
+        /* TLS_DH_anon_WITH_AES_128_CBC_SHA  */ 0xC0, 0x34,
+        /* TLS_RSA_WITH_AES_256_CBC_SHA      */ 0xC0, 0x35,
+        /* TLS_RSA_WITH_AES_128_CBC_SHA      */ 0xC0, 0x2F,
+        /* TLS_RSA_WITH_NULL_MD5             */ 0xC0, 0x01,
+        /* TLS_RSA_WITH_NULL_SHA             */ 0xC0, 0x02,
+        /* TLS_PSK_WITH_AES_256_CBC_SHA      */ 0xC0, 0x8d,
+        /* TLS_PSK_WITH_AES_128_CBC_SHA256   */ 0xC0, 0xae,
+        /* TLS_PSK_WITH_AES_256_CBC_SHA384   */ 0xC0, 0xaf,
+        /* TLS_PSK_WITH_AES_128_CBC_SHA      */ 0xC0, 0x8c,
+        /* TLS_PSK_WITH_NULL_SHA256          */ 0xC0, 0xb0,
+        /* TLS_PSK_WITH_NULL_SHA384          */ 0xC0, 0xb1,
+        /* TLS_PSK_WITH_NULL_SHA             */ 0xC0, 0x2c,
+        /* SSL_RSA_WITH_RC4_128_SHA          */ 0xC0, 0x05,
+        /* SSL_RSA_WITH_RC4_128_MD5          */ 0xC0, 0x04,
+        /* SSL_RSA_WITH_3DES_EDE_CBC_SHA     */ 0xC0, 0x0A,
+
+        /* ECC suites, first byte is 0xC0 (ECC_BYTE) */
+        /* TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA     */ 0xC0, 0x14,
+        /* TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA     */ 0xC0, 0x13,
+        /* TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA   */ 0xC0, 0x0A,
+        /* TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA   */ 0xC0, 0x09,
+        /* TLS_ECDHE_RSA_WITH_RC4_128_SHA         */ 0xC0, 0x11,
+        /* TLS_ECDHE_ECDSA_WITH_RC4_128_SHA       */ 0xC0, 0x07,
+        /* TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA    */ 0xC0, 0x12,
+        /* TLS_ECDHE_ECDSA_WITH_3DES_EDE_CBC_SHA  */ 0xC0, 0x08,
+        /* TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256  */ 0xC0, 0x27,
+        /* TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256*/ 0xC0, 0x23,
+        /* TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384  */ 0xC0, 0x28,
+        /* TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384*/ 0xC0, 0x24,
+        /* TLS_ECDHE_ECDSA_WITH_NULL_SHA          */ 0xC0, 0x06,
+        /* TLS_ECDHE_PSK_WITH_NULL_SHA256         */ 0xC0, 0x3a,
+        /* TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256  */ 0xC0, 0x37,
+
+        /* static ECDH, first byte is 0xC0 (ECC_BYTE) */
+        /* TLS_ECDH_RSA_WITH_AES_256_CBC_SHA      */ 0xC0, 0x0F,
+        /* TLS_ECDH_RSA_WITH_AES_128_CBC_SHA      */ 0xC0, 0x0E,
+        /* TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA    */ 0xC0, 0x05,
+        /* TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA    */ 0xC0, 0x04,
+        /* TLS_ECDH_RSA_WITH_RC4_128_SHA          */ 0xC0, 0x0C,
+        /* TLS_ECDH_ECDSA_WITH_RC4_128_SHA        */ 0xC0, 0x02,
+        /* TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA     */ 0xC0, 0x0D,
+        /* TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA   */ 0xC0, 0x03,
+        /* TLS_ECDH_RSA_WITH_AES_128_CBC_SHA256   */ 0xC0, 0x29,
+        /* TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA256 */ 0xC0, 0x25,
+        /* TLS_ECDH_RSA_WITH_AES_256_CBC_SHA384   */ 0xC0, 0x2A,
+        /* TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA384 */ 0xC0, 0x26,
+
+        /* WDM_WITH_NULL_SHA256 */ 0x00, 0xFE, /* wolfSSL DTLS Multicast */
+
+        /* SHA256 */
+        /* TLS_DHE_RSA_WITH_AES_256_CBC_SHA256 */ 0x00, 0x6b,
+        /* TLS_DHE_RSA_WITH_AES_128_CBC_SHA256 */ 0x00, 0x67,
+        /* TLS_RSA_WITH_AES_256_CBC_SHA256     */ 0x00, 0x3d,
+        /* TLS_RSA_WITH_AES_128_CBC_SHA256     */ 0x00, 0x3c,
+        /* TLS_RSA_WITH_NULL_SHA256            */ 0x00, 0x3b,
+        /* TLS_DHE_PSK_WITH_AES_128_CBC_SHA256 */ 0x00, 0xb2,
+        /* TLS_DHE_PSK_WITH_NULL_SHA256        */ 0x00, 0xb4,
+
+        /* SHA384 */
+        /* TLS_DHE_PSK_WITH_AES_256_CBC_SHA384 */ 0x00, 0xb3,
+        /* TLS_DHE_PSK_WITH_NULL_SHA384        */ 0x00, 0xb5,
+
+        /* AES-GCM */
+        /* TLS_RSA_WITH_AES_128_GCM_SHA256      */ 0x00, 0x9c,
+        /* TLS_RSA_WITH_AES_256_GCM_SHA384      */ 0x00, 0x9d,
+        /* TLS_DHE_RSA_WITH_AES_128_GCM_SHA256  */ 0x00, 0x9e,
+        /* TLS_DHE_RSA_WITH_AES_256_GCM_SHA384  */ 0x00, 0x9f,
+        /* TLS_DH_anon_WITH_AES_256_GCM_SHA384  */ 0x00, 0xa7,
+        /* TLS_PSK_WITH_AES_128_GCM_SHA256      */ 0x00, 0xa8,
+        /* TLS_PSK_WITH_AES_256_GCM_SHA384      */ 0x00, 0xa9,
+        /* TLS_DHE_PSK_WITH_AES_128_GCM_SHA256  */ 0x00, 0xaa,
+        /* TLS_DHE_PSK_WITH_AES_256_GCM_SHA384  */ 0x00, 0xab,
+
+        /* ECC AES-GCM, first byte is 0xC0 (ECC_BYTE) */
+        /* TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 */ 0xC0, 0x2b,
+        /* TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 */ 0xC0, 0x2c,
+        /* TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256  */ 0xC0, 0x2d,
+        /* TLS_ECDH_ECDSA_WITH_AES_256_GCM_SHA384  */ 0xC0, 0x2e,
+        /* TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256   */ 0xC0, 0x2f,
+        /* TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384   */ 0xC0, 0x30,
+        /* TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256    */ 0xC0, 0x31,
+        /* TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384    */ 0xC0, 0x32,
+
+        /* AES-CCM, first byte is 0xC0 but isn't ECC,
+         * also, in some of the other AES-CCM suites
+         * there will be second byte number conflicts
+         * with non-ECC AES-GCM */
+        /* TLS_RSA_WITH_AES_128_CCM_8         */ 0xC0, 0xa0,
+        /* TLS_RSA_WITH_AES_256_CCM_8         */ 0xC0, 0xa1,
+        /* TLS_ECDHE_ECDSA_WITH_AES_128_CCM   */ 0xC0, 0xac,
+        /* TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 */ 0xC0, 0xae,
+        /* TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8 */ 0xC0, 0xaf,
+        /* TLS_PSK_WITH_AES_128_CCM           */ 0xC0, 0xa4,
+        /* TLS_PSK_WITH_AES_256_CCM           */ 0xC0, 0xa5,
+        /* TLS_PSK_WITH_AES_128_CCM_8         */ 0xC0, 0xa8,
+        /* TLS_PSK_WITH_AES_256_CCM_8         */ 0xC0, 0xa9,
+        /* TLS_DHE_PSK_WITH_AES_128_CCM       */ 0xC0, 0xa6,
+        /* TLS_DHE_PSK_WITH_AES_256_CCM       */ 0xC0, 0xa7,
+
+        /* Camellia */
+        /* TLS_RSA_WITH_CAMELLIA_128_CBC_SHA        */ 0x00, 0x41,
+        /* TLS_RSA_WITH_CAMELLIA_256_CBC_SHA        */ 0x00, 0x84,
+        /* TLS_RSA_WITH_CAMELLIA_128_CBC_SHA256     */ 0x00, 0xba,
+        /* TLS_RSA_WITH_CAMELLIA_256_CBC_SHA256     */ 0x00, 0xc0,
+        /* TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA    */ 0x00, 0x45,
+        /* TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA    */ 0x00, 0x88,
+        /* TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA256 */ 0x00, 0xbe,
+        /* TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA256 */ 0x00, 0xc4,
+
+        /* chacha20-poly1305 suites first byte is 0xCC (CHACHA_BYTE) */
+        /* TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256   */ 0xCC, 0xa8,
+        /* TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 */ 0xCC, 0xa9,
+        /* TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256     */ 0xCC, 0xaa,
+        /* TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256   */ 0xCC, 0xac,
+        /* TLS_PSK_WITH_CHACHA20_POLY1305_SHA256         */ 0xCC, 0xab,
+        /* TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256     */ 0xCC, 0xad,
+
+        /* chacha20-poly1305 earlier version of nonce and padding (CHACHA_BYTE) */
+        /* TLS_ECDHE_RSA_WITH_CHACHA20_OLD_POLY1305_SHA256   */ 0xCC, 0x13,
+        /* TLS_ECDHE_ECDSA_WITH_CHACHA20_OLD_POLY1305_SHA256 */ 0xCC, 0x14,
+        /* TLS_DHE_RSA_WITH_CHACHA20_OLD_POLY1305_SHA256     */ 0xCC, 0x15,
+
+        /* ECDHE_PSK RFC8442, first byte is 0xD0 (ECDHE_PSK_BYTE) */
+        /* TLS_ECDHE_PSK_WITH_AES_128_GCM_SHA256 */ 0xD0, 0x01,
+
+        /* TLS v1.3 cipher suites */
+        /* TLS_AES_128_GCM_SHA256       */ 0x13, 0x01,
+        /* TLS_AES_256_GCM_SHA384       */ 0x13, 0x02,
+        /* TLS_CHACHA20_POLY1305_SHA256 */ 0x13, 0x03,
+        /* TLS_AES_128_CCM_SHA256       */ 0x13, 0x04,
+        /* TLS_AES_128_CCM_8_SHA256     */ 0x13, 0x05,
+
+        /* TLS v1.3 Integrity only cipher suites - 0xC0 (ECC) first byte */
+        /* TLS_SHA256_SHA256 */ 0xC0, 0xB4,
+        /* TLS_SHA384_SHA384 */ 0xC0, 0xB5
+    };
+
+#ifndef NO_RSA
+    testCertFile = svrCertFile;
+    testKeyFile = svrKeyFile;
+#elif defined(HAVE_ECC)
+    testCertFile = eccCertFile;
+    testKeyFile = eccKeyFile;
+#endif
+
+#ifndef NO_WOLFSSL_SERVER
+    ctx = wolfSSL_CTX_new(wolfSSLv23_server_method());
+    AssertNotNull(ctx);
+#else
+    ctx = wolfSSL_CTX_new(wolfSSLv23_client_method());
+    AssertNotNull(ctx);
+#endif
+
+    AssertTrue(wolfSSL_CTX_set_cipher_list_bytes(ctx, &cipherList[0U],
+                                                           sizeof(cipherList)));
+
+    wolfSSL_CTX_free(ctx);
+
+#ifndef NO_WOLFSSL_SERVER
+    ctx = wolfSSL_CTX_new(wolfSSLv23_server_method());
+    AssertNotNull(ctx);
+#else
+    ctx = wolfSSL_CTX_new(wolfSSLv23_client_method());
+    AssertNotNull(ctx);
+#endif
+
+    AssertTrue(wolfSSL_CTX_use_certificate_file(ctx, testCertFile,
+                                                         WOLFSSL_FILETYPE_PEM));
+    AssertTrue(wolfSSL_CTX_use_PrivateKey_file(ctx, testKeyFile,
+                                                         WOLFSSL_FILETYPE_PEM));
+
+    ssl = wolfSSL_new(ctx);
+    AssertNotNull(ssl);
+
+    AssertTrue(wolfSSL_set_cipher_list_bytes(ssl, &cipherList[0U],
+                                                           sizeof(cipherList)));
+
+    wolfSSL_free(ssl);
+    wolfSSL_CTX_free(ctx);
+
+#endif /* (OPENSSL_EXTRA || WOLFSSL_SET_CIPHER_BYTES) &&
+    (!NO_WOLFSSL_CLIENT || !NO_WOLFSSL_SERVER) && (!NO_RSA || HAVE_ECC) */
+
+    return 0;
+}
+
+
 static int test_wolfSSL_CTX_use_certificate_file(void)
 {
 #if !defined(NO_FILESYSTEM) && !defined(NO_CERTS) && !defined(NO_WOLFSSL_SERVER)
@@ -39202,6 +39404,9 @@ static int test_wolfSSL_HMAC(void)
             test_openssl_hmac(EVP_sha3_512(), (int)WC_SHA3_512_DIGEST_SIZE);
         #endif
     #endif
+    #ifndef NO_SHA
+        test_openssl_hmac(EVP_sha1(), (int)WC_SHA_DIGEST_SIZE);
+    #endif
 
     printf(resultFmt, passed);
 #endif
@@ -46906,7 +47111,7 @@ static int test_wolfSSL_TXT_DB(void)
 
     /* Test index */
     AssertIntEQ(TXT_DB_create_index(db, 3, NULL, (wolf_sk_hash_cb)TXT_DB_hash,
-            (wolf_sk_compare_cb)TXT_DB_cmp), 1);
+            (wolf_lh_compare_cb)TXT_DB_cmp), 1);
     AssertNotNull(TXT_DB_get_by_index(db, 3, (WOLFSSL_STRING*)fields));
     fields[3] = "12DA";
     AssertNotNull(TXT_DB_get_by_index(db, 3, (WOLFSSL_STRING*)fields));
@@ -57934,6 +58139,139 @@ static int test_wolfSSL_DtlsUpdateWindow(void)
 }
 #endif /* WOLFSSL_DTLS */
 
+#ifdef WOLFSSL_DTLS
+static int DFB_TEST(WOLFSSL* ssl, word32 seq, word32 len, word32 f_offset,
+        word32 f_len, word32 f_count, byte ready, word32 bytesReceived)
+{
+    DtlsMsg* cur;
+    static byte msg[100];
+    static byte msgInit = 0;
+
+    if (!msgInit) {
+        int i;
+        for (i = 0; i < 100; i++)
+            msg[i] = i + 1;
+        msgInit = 1;
+    }
+
+    /* Sanitize test parameters */
+    if (len > sizeof(msg))
+        return -1;
+    if (f_offset + f_len > sizeof(msg))
+        return -1;
+
+    DtlsMsgStore(ssl, 0, seq, msg + f_offset, len, certificate, f_offset, f_len, NULL);
+
+    if (ssl->dtls_rx_msg_list == NULL)
+        return -100;
+
+    if ((cur = DtlsMsgFind(ssl->dtls_rx_msg_list, 0, seq)) == NULL)
+        return -200;
+    if (cur->fragBucketListCount != f_count)
+        return -300;
+    if (cur->ready != ready)
+        return -400;
+    if (cur->bytesReceived != bytesReceived)
+        return -500;
+    if (ready) {
+        if (cur->fragBucketList != NULL)
+            return -600;
+        if (XMEMCMP(cur->fullMsg, msg, cur->sz) != 0)
+            return -700;
+    }
+    else {
+        DtlsFragBucket* fb;
+        if (cur->fragBucketList == NULL)
+            return -800;
+        for (fb = cur->fragBucketList; fb != NULL; fb = fb->m.m.next) {
+            if (XMEMCMP(fb->buf, msg + fb->m.m.offset, fb->m.m.sz) != 0)
+                return -900;
+        }
+    }
+    return 0;
+}
+
+static void DFB_TEST_RESET(WOLFSSL* ssl)
+{
+    DtlsMsgListDelete(ssl->dtls_rx_msg_list, ssl->heap);
+    ssl->dtls_rx_msg_list = NULL;
+    ssl->dtls_rx_msg_list_sz = 0;
+}
+
+static int test_wolfSSL_DTLS_fragment_buckets(void)
+{
+    WOLFSSL ssl[1];
+
+    printf(testingFmt, "wolfSSL_DTLS_fragment_buckets()");
+
+    XMEMSET(ssl, 0, sizeof(*ssl));
+
+    AssertIntEQ(DFB_TEST(ssl, 0, 100, 0, 100, 0, 1, 100), 0); /*  0-100 */
+
+    AssertIntEQ(DFB_TEST(ssl, 1, 100,  0, 20, 1, 0,  20), 0); /*  0-20  */
+    AssertIntEQ(DFB_TEST(ssl, 1, 100, 20, 20, 1, 0,  40), 0); /* 20-40  */
+    AssertIntEQ(DFB_TEST(ssl, 1, 100, 40, 20, 1, 0,  60), 0); /* 40-60  */
+    AssertIntEQ(DFB_TEST(ssl, 1, 100, 60, 20, 1, 0,  80), 0); /* 60-80  */
+    AssertIntEQ(DFB_TEST(ssl, 1, 100, 80, 20, 0, 1, 100), 0); /* 80-100 */
+
+    /* Test all permutations of 3 regions */
+    /* 1 2 3 */
+    AssertIntEQ(DFB_TEST(ssl, 2, 100,  0, 30, 1, 0,  30), 0); /*  0-30  */
+    AssertIntEQ(DFB_TEST(ssl, 2, 100, 30, 30, 1, 0,  60), 0); /* 30-60  */
+    AssertIntEQ(DFB_TEST(ssl, 2, 100, 60, 40, 0, 1, 100), 0); /* 60-100 */
+    /* 1 3 2 */
+    AssertIntEQ(DFB_TEST(ssl, 3, 100,  0, 30, 1, 0,  30), 0); /*  0-30  */
+    AssertIntEQ(DFB_TEST(ssl, 3, 100, 60, 40, 2, 0,  70), 0); /* 60-100 */
+    AssertIntEQ(DFB_TEST(ssl, 3, 100, 30, 30, 0, 1, 100), 0); /* 30-60  */
+    /* 2 1 3 */
+    AssertIntEQ(DFB_TEST(ssl, 4, 100, 30, 30, 1, 0,  30), 0); /* 30-60  */
+    AssertIntEQ(DFB_TEST(ssl, 4, 100,  0, 30, 1, 0,  60), 0); /*  0-30  */
+    AssertIntEQ(DFB_TEST(ssl, 4, 100, 60, 40, 0, 1, 100), 0); /* 60-100 */
+    /* 2 3 1 */
+    AssertIntEQ(DFB_TEST(ssl, 5, 100, 30, 30, 1, 0,  30), 0); /* 30-60  */
+    AssertIntEQ(DFB_TEST(ssl, 5, 100, 60, 40, 1, 0,  70), 0); /* 60-100 */
+    AssertIntEQ(DFB_TEST(ssl, 5, 100,  0, 30, 0, 1, 100), 0); /*  0-30  */
+    /* 3 1 2 */
+    AssertIntEQ(DFB_TEST(ssl, 6, 100, 60, 40, 1, 0,  40), 0); /* 60-100 */
+    AssertIntEQ(DFB_TEST(ssl, 6, 100,  0, 30, 2, 0,  70), 0); /*  0-30  */
+    AssertIntEQ(DFB_TEST(ssl, 6, 100, 30, 30, 0, 1, 100), 0); /* 30-60  */
+    /* 3 2 1 */
+    AssertIntEQ(DFB_TEST(ssl, 7, 100, 60, 40, 1, 0,  40), 0); /* 60-100 */
+    AssertIntEQ(DFB_TEST(ssl, 7, 100, 30, 30, 1, 0,  70), 0); /* 30-60  */
+    AssertIntEQ(DFB_TEST(ssl, 7, 100,  0, 30, 0, 1, 100), 0); /*  0-30  */
+
+    /* Test overlapping regions */
+    AssertIntEQ(DFB_TEST(ssl, 8, 100,  0, 30, 1, 0,  30), 0); /*  0-30  */
+    AssertIntEQ(DFB_TEST(ssl, 8, 100, 20, 10, 1, 0,  30), 0); /* 20-30  */
+    AssertIntEQ(DFB_TEST(ssl, 8, 100, 70, 10, 2, 0,  40), 0); /* 70-80  */
+    AssertIntEQ(DFB_TEST(ssl, 8, 100, 20, 30, 2, 0,  60), 0); /* 20-50  */
+    AssertIntEQ(DFB_TEST(ssl, 8, 100, 40, 60, 0, 1, 100), 0); /* 40-100 */
+
+    /* Test overlapping multiple regions */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100,  0, 20, 1, 0,  20), 0); /*  0-20  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 30,  5, 2, 0,  25), 0); /* 30-35  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 40,  5, 3, 0,  30), 0); /* 40-45  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 50,  5, 4, 0,  35), 0); /* 50-55  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 60,  5, 5, 0,  40), 0); /* 60-65  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 70,  5, 6, 0,  45), 0); /* 70-75  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 30, 25, 4, 0,  55), 0); /* 30-55  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 55, 15, 2, 0,  65), 0); /* 55-70  */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 75, 25, 2, 0,  90), 0); /* 75-100 */
+    AssertIntEQ(DFB_TEST(ssl, 9, 100, 10, 25, 0, 1, 100), 0); /* 10-35 */
+
+    AssertIntEQ(DFB_TEST(ssl, 10, 100,  0, 20, 1, 0,  20), 0); /*  0-20  */
+    AssertIntEQ(DFB_TEST(ssl, 10, 100, 30, 20, 2, 0,  40), 0); /* 30-50  */
+    AssertIntEQ(DFB_TEST(ssl, 10, 100,  0, 40, 1, 0,  50), 0); /*  0-40  */
+    AssertIntEQ(DFB_TEST(ssl, 10, 100, 50, 50, 0, 1, 100), 0); /* 10-35 */
+
+    DFB_TEST_RESET(ssl);
+
+    printf(resultFmt, passed);
+
+    return 0;
+}
+#endif
+
 /*----------------------------------------------------------------------------*
  | Main
  *----------------------------------------------------------------------------*/
@@ -57968,6 +58306,7 @@ TEST_CASE testCases[] = {
     TEST_DECL(test_EVP_blake2),
     TEST_DECL(test_EVP_MD_do_all),
     TEST_DECL(test_OBJ_NAME_do_all),
+    TEST_DECL(test_wolfSSL_CTX_set_cipher_list_bytes),
     TEST_DECL(test_wolfSSL_CTX_use_certificate_file),
     TEST_DECL(test_wolfSSL_CTX_use_certificate_buffer),
     TEST_DECL(test_wolfSSL_CTX_use_PrivateKey_file),
@@ -58833,6 +59172,7 @@ TEST_CASE testCases[] = {
     TEST_DECL(test_wolfSSL_FIPS_mode),
 #ifdef WOLFSSL_DTLS
     TEST_DECL(test_wolfSSL_DtlsUpdateWindow),
+    TEST_DECL(test_wolfSSL_DTLS_fragment_buckets),
 #endif
 
     TEST_DECL(test_ForceZero),
