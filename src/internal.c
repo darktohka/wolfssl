@@ -4922,6 +4922,11 @@ int EccSign(WOLFSSL* ssl, const byte* in, word32 inSz, byte* out,
         }
         ret = ssl->ctx->EccSignCb(ssl, in, inSz, out, outSz, keyBuf,
             keySz, ctx);
+#if defined(WOLFSSL_RENESAS_TSIP_TLS)
+        if (ret == CRYPTOCB_UNAVAILABLE) {
+            ret = wc_ecc_sign_hash(in, inSz, out, outSz, ssl->rng, key);
+        }
+#endif /* WOLFSSL_RENESAS_TSIP_TLS */
     }
     else
 #endif /* HAVE_PK_CALLBACKS */
@@ -7629,7 +7634,7 @@ void SSL_ResourceFree(WOLFSSL* ssl)
         }
     #endif
 #endif
-#ifdef HAVE_PQC
+#if defined(HAVE_PQC) && defined(HAVE_FALCON)
     FreeKey(ssl, DYNAMIC_TYPE_FALCON, (void**)&ssl->peerFalconKey);
     ssl->peerFalconKeyPresent = 0;
 #endif
@@ -7864,7 +7869,7 @@ void FreeHandshakeResources(WOLFSSL* ssl)
         FreeKey(ssl, DYNAMIC_TYPE_ED448, (void**)&ssl->peerEd448Key);
         ssl->peerEd448KeyPresent = 0;
 #endif /* HAVE_ED448 */
-#ifdef HAVE_PQC
+#if defined(HAVE_PQC) && defined(HAVE_FALCON)
         FreeKey(ssl, DYNAMIC_TYPE_FALCON, (void**)&ssl->peerFalconKey);
         ssl->peerFalconKeyPresent = 0;
 #endif /* HAVE_PQC */
@@ -8147,6 +8152,11 @@ DtlsMsg* DtlsMsgNew(word32 sz, byte tx, void* heap)
     DtlsMsg* msg;
     WOLFSSL_ENTER("DtlsMsgNew()");
 
+    if (sz == 0) {
+        WOLFSSL_MSG("DtlsMsgNew: sz == 0 not allowed");
+        return NULL;
+    }
+
     (void)heap;
     msg = (DtlsMsg*)XMALLOC(sizeof(DtlsMsg), heap, DYNAMIC_TYPE_DTLS_MSG);
 
@@ -8376,16 +8386,15 @@ static void DtlsMsgAssembleCompleteMessage(DtlsMsg* msg)
 
     /* frag->padding makes sure we can fit the entire DTLS handshake header
      * before frag->buf */
-    dtls = (DtlsHandShakeHeader*)(void *)((char *)msg->fragBucketList
-                                          + OFFSETOF(DtlsFragBucket,buf)
-                                          - DTLS_HANDSHAKE_HEADER_SZ);
+    dtls = (DtlsHandShakeHeader*)(msg->fragBucketList->buf -
+                                    DTLS_HANDSHAKE_HEADER_SZ);
 
     msg->fragBucketList = NULL;
     msg->fragBucketListCount = 0;
 
     dtls->type = msg->type;
     c32to24(msg->sz, dtls->length);
-    c16toa(msg->seq, dtls->message_seq);
+    c16toa((word16)msg->seq, dtls->message_seq);
     c32to24(0, dtls->fragment_offset);
     c32to24(msg->sz, dtls->fragment_length);
 }
@@ -8422,8 +8431,13 @@ int DtlsMsgSet(DtlsMsg* msg, word32 seq, word16 epoch, const byte* data, byte ty
     if (msg->fragBucketList == NULL) {
         /* Clean list. Create first fragment. */
         msg->fragBucketList = DtlsMsgCreateFragBucket(fragOffset, data, fragSz, heap);
-        msg->bytesReceived = fragSz;
-        msg->fragBucketListCount++;
+        if (msg->fragBucketList != NULL) {
+            msg->bytesReceived = fragSz;
+            msg->fragBucketListCount++;
+        }
+        else {
+            return MEMORY_ERROR;
+        }
     }
     else {
         /* See if we can expand any existing bucket to fit this new data into */
@@ -8629,7 +8643,6 @@ int DtlsMsgPoolSave(WOLFSSL* ssl, const byte* data, word32 dataSz,
         DtlsMsg* cur = ssl->dtls_tx_msg_list;
 
         XMEMCPY(item->raw, data, dataSz);
-        item->sz = dataSz;
         item->epoch = ssl->keys.dtls_epoch;
         item->seq = ssl->keys.dtls_handshake_number;
         item->type = type;
@@ -9303,7 +9316,7 @@ int HashOutput(WOLFSSL* ssl, const byte* output, int sz, int ivSz)
         if (IsAtLeastTLSv1_3(ssl->version)) {
 #ifdef WOLFSSL_DTLS13
             word16 dtls_record_extra;
-            dtls_record_extra = Dtls13GetRlHeaderLength(ssl, IsEncryptionOn(ssl, 1));
+            dtls_record_extra = Dtls13GetRlHeaderLength(ssl, (byte)IsEncryptionOn(ssl, 1));
             dtls_record_extra -= RECORD_HEADER_SZ;
 
             adj += dtls_record_extra;
@@ -9339,7 +9352,7 @@ int HashInput(WOLFSSL* ssl, const byte* input, int sz)
 
 #ifdef WOLFSSL_DTLS13
         if (IsAtLeastTLSv1_3(ssl->version))
-            return Dtls13HashHandshake(ssl, adj, sz);
+            return Dtls13HashHandshake(ssl, adj, (word16)sz);
 #endif /* WOLFSSL_DTLS13 */
 
     }
@@ -10161,7 +10174,7 @@ static int GetDtls13RecordHeader(WOLFSSL* ssl, const byte* input,
             return ret;
     }
 
-    ret = Dtls13ParseUnifiedRecordLayer(ssl, input + *inOutIdx, readSize,
+    ret = Dtls13ParseUnifiedRecordLayer(ssl, input + *inOutIdx, (word16)readSize,
         &hdrInfo);
 
     if (ret != 0)
@@ -20681,6 +20694,7 @@ int BuildMessage(WOLFSSL* ssl, byte* output, int outSz, const byte* input,
             if (sizeOnly)
                 goto exit_buildmsg;
 
+			{
     #if defined(HAVE_SECURE_RENEGOTIATION) && defined(WOLFSSL_DTLS)
             /* If we want the PREV_ORDER then modify CUR_ORDER sequence number
              * for all encryption algos that use it for encryption parameters */
@@ -20721,6 +20735,8 @@ int BuildMessage(WOLFSSL* ssl, byte* output, int outSz, const byte* input,
                 ssl->keys.dtls_sequence_number_lo = dtls_sequence_number_lo;
             }
     #endif
+			}
+
             if (ret != 0)
                 goto exit_buildmsg;
             ssl->options.buildMsgState = BUILD_MSG_ENCRYPTED_VERIFY_MAC;

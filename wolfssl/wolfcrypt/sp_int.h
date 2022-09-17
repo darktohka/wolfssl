@@ -778,6 +778,19 @@ typedef struct sp_int {
     sp_int_digit dp[SP_INT_DIGITS];
 } sp_int;
 
+typedef struct sp_int_minimal {
+    int used;
+    int size;
+#ifdef WOLFSSL_SP_INT_NEGATIVE
+    int sign;
+#endif
+#ifdef HAVE_WOLF_BIGINT
+    struct WC_BIGINT raw;
+#endif
+    /** First digit of number.  */
+    sp_int_digit dp[1];
+} sp_int_minimal;
+
 /* Multi-precision integer type is SP integer type. */
 typedef sp_int       mp_int;
 /* Multi-precision integer digit type is SP integer digit type.
@@ -864,7 +877,7 @@ MP_API int sp_addmod_ct (sp_int* a, sp_int* b, sp_int* c, sp_int* d);
 
 MP_API int sp_lshd(sp_int* a, int s);
 MP_API void sp_rshd(sp_int* a, int c);
-MP_API void sp_rshb(sp_int* a, int n, sp_int* r);
+MP_API int sp_rshb(sp_int* a, int n, sp_int* r);
 
 #ifdef WOLFSSL_SP_MATH_ALL
 MP_API int sp_div(sp_int* a, sp_int* d, sp_int* r, sp_int* rem);
